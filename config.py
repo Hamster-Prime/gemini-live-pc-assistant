@@ -1,0 +1,103 @@
+from __future__ import annotations
+
+import json
+import os
+import threading
+from dataclasses import asdict, dataclass
+from pathlib import Path
+from typing import Any
+
+
+CONFIG_FILE = Path(__file__).with_name("assistant_config.json")
+
+
+@dataclass(slots=True)
+class AppConfig:
+    api_key: str = ""
+    model: str = "gemini-3.1-flash-live-preview"
+    hotkey: str = "ctrl+space"
+    wake_word: str = "小助手"
+    vad_threshold: float = 180.0
+    vad_multiplier: float = 2.2
+    vad_attack_ms: int = 150
+    vad_release_ms: int = 900
+    pre_roll_ms: int = 300
+    manual_listen_timeout: float = 8.0
+    input_rate: int = 16000
+    output_rate: int = 24000
+    input_device_rate: int = 16000
+    output_device_rate: int = 24000
+    chunk_ms: int = 30
+    input_device_index: int = -1
+    output_device_index: int = -1
+    reconnect_initial_delay: float = 2.0
+    reconnect_max_delay: float = 12.0
+    status_window_x: int = 30
+    status_window_y: int = 30
+    screenshot_dir: str = "runtime/screenshots"
+
+    def resolved_api_key(self) -> str:
+        return self.api_key.strip() or os.getenv("GEMINI_API_KEY", "").strip()
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+class ConfigManager:
+    def __init__(self, path: Path | None = None) -> None:
+        self.path = path or CONFIG_FILE
+        self._lock = threading.RLock()
+
+    def load(self) -> AppConfig:
+        with self._lock:
+            if not self.path.exists():
+                config = AppConfig(api_key=os.getenv("GEMINI_API_KEY", "").strip())
+                self.save(config)
+                return config
+
+            try:
+                data = json.loads(self.path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                data = {}
+
+            config = AppConfig()
+            for key, value in data.items():
+                if hasattr(config, key):
+                    setattr(config, key, value)
+
+            if not config.api_key:
+                config.api_key = os.getenv("GEMINI_API_KEY", "").strip()
+
+            return config
+
+    def save(self, config: AppConfig) -> None:
+        with self._lock:
+            self.path.write_text(
+                json.dumps(config.to_dict(), ensure_ascii=False, indent=2),
+                encoding="utf-8",
+            )
+
+    def update(self, **kwargs: Any) -> AppConfig:
+        with self._lock:
+            config = self.load()
+            for key, value in kwargs.items():
+                if hasattr(config, key):
+                    setattr(config, key, self._coerce_value(getattr(config, key), value))
+            self.save(config)
+            return config
+
+    @staticmethod
+    def _coerce_value(current: Any, value: Any) -> Any:
+        if isinstance(current, bool):
+            if isinstance(value, str):
+                return value.strip().lower() in {"1", "true", "yes", "on"}
+            return bool(value)
+
+        if isinstance(current, int) and not isinstance(current, bool):
+            return int(value)
+
+        if isinstance(current, float):
+            return float(value)
+
+        return value
+
