@@ -85,10 +85,14 @@ class MainWindow:
         self._root.after(0, lambda: self._status_var.set(text))
 
     def set_user_text(self, text: str) -> None:
-        self._append_text(self._user_text, text)
+        from datetime import datetime
+        timestamp = datetime.now().strftime("%H:%M:%S")
+        self._append_text(self._user_text, f"[{timestamp}] {text}")
 
     def set_assistant_text(self, text: str) -> None:
-        self._append_text(self._assistant_text, text)
+        from datetime import datetime
+        timestamp = datetime.now().strftime("%H:%M:%S")
+        self._append_text(self._assistant_text, f"[{timestamp}] {text}")
 
     def set_listening(self, listening: bool) -> None:
         if self._root is None or self._toggle_button is None:
