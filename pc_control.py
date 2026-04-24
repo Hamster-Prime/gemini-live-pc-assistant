@@ -143,16 +143,6 @@ class PCController:
             "hex": hex_color,
         }
 
-    def find_on_screen(self, confidence: float = 0.8) -> dict[str, Any]:
-        """尝试在屏幕上找到鼠标位置附近的可交互元素。"""
-        x, y = pyautogui.position()
-        return {
-            "ok": True,
-            "action": "find_on_screen",
-            "mouse_x": x, "mouse_y": y,
-            "hint": "使用 screenshot 工具查看屏幕内容",
-        }
-
     def get_screen_info(self) -> dict[str, Any]:
         width, height = pyautogui.size()
         x, y = pyautogui.position()
@@ -284,23 +274,21 @@ class PCController:
 
     def list_processes(self) -> dict[str, Any]:
         """列出所有运行中的进程。"""
-        result = subprocess.run(
-            ["tasklist", "/FO", "CSV"],
-            capture_output=True,
-            text=True,
-            shell=False,
-        )
-        if result.returncode != 0:
-            return {"ok": False, "error": "获取进程列表失败"}
-        processes = []
-        for line in result.stdout.strip().split("\n")[1:]:
-            parts = line.strip().split(",")
-            if len(parts) >= 2:
-                processes.append({
-                    "name": parts[0].strip('"'),
-                    "pid": parts[1].strip('"'),
-                })
-        return {"ok": True, "action": "list_processes", "processes": processes[:50]}
+        try:
+            import psutil
+            processes = []
+            for proc in psutil.process_iter(["pid", "name", "cpu_percent", "memory_percent"]):
+                try:
+                    info = proc.info
+                    processes.append({
+                        "name": info["name"] or "",
+                        "pid": str(info["pid"]),
+                    })
+                except (psutil.NoSuchProcess, psutil.AccessDenied):
+                    continue
+            return {"ok": True, "action": "list_processes", "processes": processes[:50]}
+        except ImportError:
+            return {"ok": False, "error": "需要安装 psutil: pip install psutil"}
 
     def get_system_info(self) -> dict[str, Any]:
         """获取系统基本信息。"""
