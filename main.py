@@ -18,7 +18,6 @@ from audio_stream import AudioStreamManager
 from config import AppConfig, ConfigManager
 from gemini_session import GeminiLiveSession
 from gui import FloatingStatusWindow, MainWindow, SettingsWindow
-from pc_control import PCController
 from tools import ToolRegistry
 from tray import TrayManager
 from wake_word import EnergyVadWakeDetector
@@ -105,7 +104,6 @@ class AssistantApp:
         self._config = self._config_manager.load()
 
         self._tool_registry = ToolRegistry(self._config)
-        self._pc_controller = PCController(self._config.screenshot_dir)
 
         self._audio_stream: AudioStreamManager | None = None
         self._wake_detector: EnergyVadWakeDetector | None = None
