@@ -242,29 +242,37 @@ class PCController:
         user32.EnumWindows(WNDENUMPROC(_enum_callback), 0)
         return {"ok": True, "action": "list_windows", "windows": windows}
 
+    @staticmethod
+    def _find_window_by_title(title: str) -> int:
+        """通过标题查找窗口，支持部分匹配。返回 hwnd 或 0。"""
+        import ctypes
+        from ctypes import wintypes
+        user32 = ctypes.windll.user32
+        # 先精确匹配
+        hwnd = user32.FindWindowW(None, title)
+        if hwnd:
+            return hwnd
+        # 部分匹配
+        WNDENUMPROC = ctypes.WINFUNCTYPE(ctypes.c_bool, wintypes.HWND, wintypes.LPARAM)
+        found = [0]
+        def _enum(hwnd, _lparam):
+            if user32.IsWindowVisible(hwnd):
+                length = user32.GetWindowTextLengthW(hwnd)
+                if length > 0:
+                    buf = ctypes.create_unicode_buffer(length + 1)
+                    user32.GetWindowTextW(hwnd, buf, length + 1)
+                    if title.lower() in buf.value.lower():
+                        found[0] = hwnd
+                        return False
+            return True
+        WNDENUMPROC(_enum)(0)
+        return found[0]
+
     def focus_window(self, title: str) -> dict[str, Any]:
         """将指定标题的窗口带到前台（支持部分匹配）。"""
         import ctypes
         user32 = ctypes.windll.user32
-        hwnd = user32.FindWindowW(None, title)
-        if not hwnd:
-            # 尝试部分匹配
-            from ctypes import wintypes
-            WNDENUMPROC = ctypes.WINFUNCTYPE(ctypes.c_bool, wintypes.HWND, wintypes.LPARAM)
-            found_hwnd = None
-            def _enum(hwnd, _lparam):
-                nonlocal found_hwnd
-                if user32.IsWindowVisible(hwnd):
-                    length = user32.GetWindowTextLengthW(hwnd)
-                    if length > 0:
-                        buf = ctypes.create_unicode_buffer(length + 1)
-                        user32.GetWindowTextW(hwnd, buf, length + 1)
-                        if title.lower() in buf.value.lower():
-                            found_hwnd = hwnd
-                            return False  # 停止枚举
-                return True
-            WNDENUMPROC(_enum)(0)
-            hwnd = found_hwnd
+        hwnd = self._find_window_by_title(title)
         if not hwnd:
             return {"ok": False, "error": f"未找到窗口: {title}"}
         user32.SetForegroundWindow(hwnd)
@@ -552,7 +560,7 @@ class PCController:
         """最小化指定标题的窗口。"""
         import ctypes
         user32 = ctypes.windll.user32
-        hwnd = user32.FindWindowW(None, title)
+        hwnd = self._find_window_by_title(title)
         if not hwnd:
             return {"ok": False, "error": f"未找到窗口: {title}"}
         user32.ShowWindow(hwnd, 6)  # SW_MINIMIZE
@@ -562,7 +570,7 @@ class PCController:
         """最大化指定标题的窗口。"""
         import ctypes
         user32 = ctypes.windll.user32
-        hwnd = user32.FindWindowW(None, title)
+        hwnd = self._find_window_by_title(title)
         if not hwnd:
             return {"ok": False, "error": f"未找到窗口: {title}"}
         user32.ShowWindow(hwnd, 3)  # SW_MAXIMIZE
@@ -572,7 +580,7 @@ class PCController:
         """恢复指定标题的窗口。"""
         import ctypes
         user32 = ctypes.windll.user32
-        hwnd = user32.FindWindowW(None, title)
+        hwnd = self._find_window_by_title(title)
         if not hwnd:
             return {"ok": False, "error": f"未找到窗口: {title}"}
         user32.ShowWindow(hwnd, 9)  # SW_RESTORE
