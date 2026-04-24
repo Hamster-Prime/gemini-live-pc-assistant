@@ -439,6 +439,25 @@ class PCController:
                 "note": "安装 psutil 可获取 CPU/内存/磁盘信息",
             }
 
+    def get_battery_status(self) -> dict[str, Any]:
+        """获取电池状态（电量、是否充电、剩余时间）。"""
+        try:
+            import psutil
+            battery = psutil.sensors_battery()
+            if battery is None:
+                return {"ok": True, "action": "get_battery_status", "note": "未检测到电池（可能是台式机）"}
+            return {
+                "ok": True,
+                "action": "get_battery_status",
+                "percent": battery.percent,
+                "is_charging": battery.power_plugged,
+                "secs_left": battery.secs_left if battery.secs_left != psutil.POWER_TIME_UNLIMITED else None,
+            }
+        except ImportError:
+            return {"ok": False, "error": "需要安装 psutil: pip install psutil"}
+        except Exception as exc:
+            return {"ok": False, "error": str(exc)}
+
     def run_command(self, command: str, timeout: int = 10) -> dict[str, Any]:
         """执行 shell 命令并返回输出。"""
         timeout = max(1, min(60, int(timeout)))

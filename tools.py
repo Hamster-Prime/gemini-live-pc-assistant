@@ -55,6 +55,7 @@ class ToolRegistry:
             "kill_process": lambda: c.kill_process(name=self._payload["name"]),
             "list_processes": c.list_processes,
             "get_system_info": c.get_system_info,
+            "get_battery_status": c.get_battery_status,
             "run_command": lambda: c.run_command(command=self._payload["command"], timeout=self._payload.get("timeout", 10)),
             "get_time": c.get_time,
             "search_web": lambda: c.search_web(query=self._payload["query"]),
@@ -384,6 +385,11 @@ class ToolRegistry:
             types.FunctionDeclaration(
                 name="get_system_info",
                 description="获取系统信息：操作系统、CPU、内存、磁盘使用情况。",
+                parameters_json_schema={"type": "object", "properties": {}},
+            ),
+            types.FunctionDeclaration(
+                name="get_battery_status",
+                description="获取电池状态：电量百分比、是否充电、剩余时间。",
                 parameters_json_schema={"type": "object", "properties": {}},
             ),
             types.FunctionDeclaration(
