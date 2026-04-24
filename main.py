@@ -180,7 +180,7 @@ class AssistantApp:
 
     def _init_audio(self) -> None:
         cfg = self._config
-        self._audio_stream = AudioStreamManager(
+        stream = AudioStreamManager(
             input_rate=cfg.input_rate,
             output_rate=cfg.output_rate,
             input_device_rate=cfg.input_device_rate,
@@ -189,9 +189,10 @@ class AssistantApp:
             input_device_index=cfg.input_device_index,
             output_device_index=cfg.output_device_index,
         )
-        self._audio_stream.add_input_listener(self._on_mic_chunk)
-        self._audio_stream.set_output_idle_callback(self._on_playback_idle)
-        self._audio_stream.start()
+        stream.add_input_listener(self._on_mic_chunk)
+        stream.set_output_idle_callback(self._on_playback_idle)
+        stream.start()
+        self._audio_stream = stream
 
     def _init_wake_detector(self) -> None:
         cfg = self._config
@@ -669,11 +670,13 @@ class AssistantApp:
         )
         if audio_changed and self._audio_stream:
             LOGGER.info("音频设备配置已变更,重启音频流")
-            self._audio_stream.stop()
+            old_stream = self._audio_stream
             try:
-                self._init_audio()
+                self._init_audio()  # assigns new stream to self._audio_stream on success
+                old_stream.stop()   # stop old stream only after new one is ready
             except Exception as exc:
                 LOGGER.exception("重启音频流失败: %s", exc)
+                self._audio_stream = old_stream  # restore old stream
                 if self._floating_status:
                     self._floating_status.set_status_text("音频重启失败，请检查设备")
                 if self._main_window:
