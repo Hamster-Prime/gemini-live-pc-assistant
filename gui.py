@@ -114,6 +114,12 @@ class MainWindow:
                 pass
         
         self._root.after(0, clear)
+    
+    def update_status_bar(self, config: AppConfig) -> None:
+        """更新状态栏显示"""
+        if self._root is None or self._status_var is None:
+            return
+        self._root.after(0, lambda: self._status_var.set(f"热键: {config.hotkey}    模型: {config.model}"))
 
     def set_listening(self, listening: bool) -> None:
         if self._root is None or self._toggle_button is None:
@@ -616,3 +622,13 @@ class FloatingStatusWindow:
                     self.hide()
             except Exception:
                 pass
+    
+    def update_opacity(self, opacity: float) -> None:
+        """实时更新悬浮窗透明度"""
+        if self._root is None:
+            return
+        try:
+            safe_opacity = max(0.1, min(1.0, opacity))
+            self._root.after(0, lambda: self._root.attributes("-alpha", safe_opacity))
+        except Exception:
+            pass

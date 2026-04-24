@@ -495,6 +495,14 @@ class AssistantApp:
         old_config = self._config
         self._config = new_config
         self._tool_registry = ToolRegistry(new_config)
+        
+        # 更新主界面状态栏显示
+        if self._main_window:
+            self._main_window.update_status_bar(new_config)
+        
+        # 更新悬浮窗透明度（实时生效）
+        if self._floating_status and old_config.status_window_opacity != new_config.status_window_opacity:
+            self._floating_status.update_opacity(new_config.status_window_opacity)
 
         # 重建唤醒检测器
         self._wake_detector = EnergyVadWakeDetector(
