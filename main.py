@@ -451,6 +451,18 @@ class AssistantApp:
             self._audio_stream.stop()
             self._init_audio()
 
+        # 热键变更时重新注册
+        if old_config.hotkey != new_config.hotkey:
+            try:
+                keyboard.remove_hotkey(old_config.hotkey)
+            except Exception:
+                pass
+            try:
+                keyboard.add_hotkey(new_config.hotkey, self._on_hotkey_pressed, suppress=False)
+                LOGGER.info("热键已更新：%s", new_config.hotkey)
+            except Exception:
+                LOGGER.exception("注册新热键 %s 失败", new_config.hotkey)
+
         # 重启 Gemini 会话以应用新配置
         if self._gemini_session:
             self._gemini_session.restart()
