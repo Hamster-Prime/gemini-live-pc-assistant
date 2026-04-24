@@ -586,6 +586,8 @@ class PCController:
             return {"ok": True, "action": "get_volume", "volume": round(vol * 100)}
         except ImportError:
             return {"ok": False, "error": "需要安装 pycaw: pip install pycaw"}
+        except Exception as exc:
+            return {"ok": False, "error": str(exc)}
 
     def set_volume(self, level: int) -> dict[str, Any]:
         """设置系统音量（0-100）。"""
@@ -601,4 +603,6 @@ class PCController:
             return {"ok": True, "action": "set_volume", "volume": level}
         except ImportError:
             return {"ok": False, "error": "需要安装 pycaw: pip install pycaw"}
+        except Exception as exc:
+            return {"ok": False, "error": str(exc)}
 
