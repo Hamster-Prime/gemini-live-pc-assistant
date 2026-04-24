@@ -55,10 +55,11 @@ class PCController:
         return {"ok": True, "action": "mouse_move", "x": x, "y": y}
 
     def mouse_scroll(self, clicks: int, x: int | None = None, y: int | None = None) -> dict[str, Any]:
+        clicks = max(-50, min(50, int(clicks)))
         if x is not None and y is not None:
             pyautogui.moveTo(int(x), int(y), duration=0.08)
-        pyautogui.scroll(int(clicks))
-        return {"ok": True, "action": "mouse_scroll", "clicks": int(clicks), "x": x, "y": y}
+        pyautogui.scroll(clicks)
+        return {"ok": True, "action": "mouse_scroll", "clicks": clicks, "x": x, "y": y}
 
     def type_text(self, text: str) -> dict[str, Any]:
         """输入文本，支持中文等非 ASCII 字符（通过剪贴板）。"""
