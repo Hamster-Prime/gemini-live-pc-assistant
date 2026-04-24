@@ -10,6 +10,7 @@ import logging.handlers
 import signal
 import sys
 import threading
+import time
 from pathlib import Path
 
 import keyboard
@@ -616,10 +617,9 @@ class AssistantApp:
                 self._main_window.set_status_text("代理配置已更新，正在重启会话...")
 
         # 重建唤醒检测器，添加音量回调（节流：每200ms最多更新一次）
-        import time as _time
         _last_vol_update = [0.0]  # mutable container for closure
         def on_volume_update(volume: int) -> None:
-            now = _time.monotonic()
+            now = time.monotonic()
             if now - _last_vol_update[0] < 0.2:
                 return
             _last_vol_update[0] = now
