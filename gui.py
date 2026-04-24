@@ -156,7 +156,6 @@ class MainWindow:
 
         cfg = self._config_getter()
         self._status_var.set(f"热键: {cfg.hotkey}    模型: {cfg.model}")
-        self._poll_status()
         self._root.mainloop()
         self._alive = False
 
@@ -193,12 +192,7 @@ class MainWindow:
             foreground=_STATE_COLORS.get(state, "#455A64"),
         )
 
-    def _poll_status(self) -> None:
-        if not self._alive or self._root is None:
-            return
-        # 只在没有详细状态信息时才轮询连接状态
-        # 避免覆盖 _on_status 回调设置的详细信息
-        self._root.after(2000, self._poll_status)
+
 
     def _hide_to_tray(self) -> None:
         if self._root is not None:
