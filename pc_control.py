@@ -132,19 +132,22 @@ class PCController:
         return {"ok": True, "action": "close_app", "name": name, "target": image_name}
 
     def screenshot(self) -> dict[str, Any]:
-        now = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
-        path = self.screenshot_dir / f"screenshot_{now}.png"
-        image = pyautogui.screenshot()
-        image.save(path)
-        width, height = image.size
-        self._cleanup_old_screenshots()
-        return {
-            "ok": True,
-            "action": "screenshot",
-            "path": str(path),
-            "width": width,
-            "height": height,
-        }
+        try:
+            now = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+            path = self.screenshot_dir / f"screenshot_{now}.png"
+            image = pyautogui.screenshot()
+            image.save(path)
+            width, height = image.size
+            self._cleanup_old_screenshots()
+            return {
+                "ok": True,
+                "action": "screenshot",
+                "path": str(path),
+                "width": width,
+                "height": height,
+            }
+        except Exception as exc:
+            return {"ok": False, "error": f"截图失败: {exc}"}
 
     def get_pixel_color(self, x: int, y: int) -> dict[str, Any]:
         """获取指定坐标的像素颜色。"""
