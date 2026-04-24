@@ -499,7 +499,13 @@ class PCController:
     def write_file(self, path: str, content: str) -> dict[str, Any]:
         """写入文本文件（原子写入）。"""
         try:
-            p = Path(path)
+            p = Path(path).resolve()
+            # 阻止写入敏感系统路径
+            blocked = ["windows/system32", "windows/syswow64", "windows/system", "/etc/"]
+            path_lower = str(p).lower()
+            for b in blocked:
+                if b in path_lower:
+                    return {"ok": False, "error": "不允许写入系统目录"}
             p.parent.mkdir(parents=True, exist_ok=True)
             tmp = p.with_suffix(p.suffix + ".tmp")
             tmp.write_text(content, encoding="utf-8")
