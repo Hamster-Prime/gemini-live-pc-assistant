@@ -276,7 +276,10 @@ class GeminiLiveSession:
             assert self._sender_queue is not None
             if message["kind"] == "audio" and self._sender_queue.qsize() > 200:
                 return
-            self._sender_queue.put_nowait(message)
+            try:
+                self._sender_queue.put_nowait(message)
+            except asyncio.QueueFull:
+                LOGGER.warning("发送队列已满，丢弃消息 (kind=%s)", message["kind"])
 
         self._loop.call_soon_threadsafe(_put)
         return True
