@@ -349,14 +349,17 @@ class PCController:
 
     def focus_window(self, title: str) -> dict[str, Any]:
         """将指定标题的窗口带到前台（支持部分匹配）。"""
-        import ctypes
-        user32 = ctypes.windll.user32
-        hwnd = self._find_window_by_title(title)
-        if not hwnd:
-            return {"ok": False, "error": f"未找到窗口: {title}"}
-        user32.SetForegroundWindow(hwnd)
-        user32.ShowWindow(hwnd, 9)  # SW_RESTORE
-        return {"ok": True, "action": "focus_window", "title": title}
+        try:
+            import ctypes
+            user32 = ctypes.windll.user32
+            hwnd = self._find_window_by_title(title)
+            if not hwnd:
+                return {"ok": False, "error": f"未找到窗口: {title}"}
+            user32.SetForegroundWindow(hwnd)
+            user32.ShowWindow(hwnd, 9)  # SW_RESTORE
+            return {"ok": True, "action": "focus_window", "title": title}
+        except Exception as exc:
+            return {"ok": False, "error": str(exc), "action": "focus_window", "title": title}
 
     def open_url(self, url: str) -> dict[str, Any]:
         """在默认浏览器中打开 URL。"""
@@ -369,15 +372,18 @@ class PCController:
 
     def kill_process(self, name: str) -> dict[str, Any]:
         """按进程名结束进程（比 close_app 更精确）。"""
-        result = subprocess.run(
-            ["taskkill", "/IM", name, "/F"],
-            capture_output=True,
-            text=True,
-            shell=False,
-        )
-        if result.returncode != 0:
-            return {"ok": False, "error": result.stderr.strip() or result.stdout.strip() or "结束进程失败"}
-        return {"ok": True, "action": "kill_process", "name": name}
+        try:
+            result = subprocess.run(
+                ["taskkill", "/IM", name, "/F"],
+                capture_output=True,
+                text=True,
+                shell=False,
+            )
+            if result.returncode != 0:
+                return {"ok": False, "error": result.stderr.strip() or result.stdout.strip() or "结束进程失败"}
+            return {"ok": True, "action": "kill_process", "name": name}
+        except Exception as exc:
+            return {"ok": False, "error": str(exc), "action": "kill_process", "name": name}
 
     def list_processes(self) -> dict[str, Any]:
         """列出所有运行中的进程。"""
@@ -678,33 +684,42 @@ class PCController:
 
     def window_minimize(self, title: str) -> dict[str, Any]:
         """最小化指定标题的窗口。"""
-        import ctypes
-        user32 = ctypes.windll.user32
-        hwnd = self._find_window_by_title(title)
-        if not hwnd:
-            return {"ok": False, "error": f"未找到窗口: {title}"}
-        user32.ShowWindow(hwnd, 6)  # SW_MINIMIZE
-        return {"ok": True, "action": "window_minimize", "title": title}
+        try:
+            import ctypes
+            user32 = ctypes.windll.user32
+            hwnd = self._find_window_by_title(title)
+            if not hwnd:
+                return {"ok": False, "error": f"未找到窗口: {title}"}
+            user32.ShowWindow(hwnd, 6)  # SW_MINIMIZE
+            return {"ok": True, "action": "window_minimize", "title": title}
+        except Exception as exc:
+            return {"ok": False, "error": str(exc), "action": "window_minimize", "title": title}
 
     def window_maximize(self, title: str) -> dict[str, Any]:
         """最大化指定标题的窗口。"""
-        import ctypes
-        user32 = ctypes.windll.user32
-        hwnd = self._find_window_by_title(title)
-        if not hwnd:
-            return {"ok": False, "error": f"未找到窗口: {title}"}
-        user32.ShowWindow(hwnd, 3)  # SW_MAXIMIZE
-        return {"ok": True, "action": "window_maximize", "title": title}
+        try:
+            import ctypes
+            user32 = ctypes.windll.user32
+            hwnd = self._find_window_by_title(title)
+            if not hwnd:
+                return {"ok": False, "error": f"未找到窗口: {title}"}
+            user32.ShowWindow(hwnd, 3)  # SW_MAXIMIZE
+            return {"ok": True, "action": "window_maximize", "title": title}
+        except Exception as exc:
+            return {"ok": False, "error": str(exc), "action": "window_maximize", "title": title}
 
     def window_restore(self, title: str) -> dict[str, Any]:
         """恢复指定标题的窗口。"""
-        import ctypes
-        user32 = ctypes.windll.user32
-        hwnd = self._find_window_by_title(title)
-        if not hwnd:
-            return {"ok": False, "error": f"未找到窗口: {title}"}
-        user32.ShowWindow(hwnd, 9)  # SW_RESTORE
-        return {"ok": True, "action": "window_restore", "title": title}
+        try:
+            import ctypes
+            user32 = ctypes.windll.user32
+            hwnd = self._find_window_by_title(title)
+            if not hwnd:
+                return {"ok": False, "error": f"未找到窗口: {title}"}
+            user32.ShowWindow(hwnd, 9)  # SW_RESTORE
+            return {"ok": True, "action": "window_restore", "title": title}
+        except Exception as exc:
+            return {"ok": False, "error": str(exc), "action": "window_restore", "title": title}
 
     def get_volume(self) -> dict[str, Any]:
         """获取系统音量（0-100）。"""
