@@ -93,24 +93,26 @@ class PCController:
 
     def type_text(self, text: str) -> dict[str, Any]:
         """输入文本，支持中文等非 ASCII 字符（通过剪贴板）。"""
-        if any(ord(c) > 127 for c in text):
-            try:
-                old_clipboard = pyperclip.paste()
-            except Exception:
-                old_clipboard = None
-            try:
-                pyperclip.copy(text)
-                time.sleep(0.05)
-                pyautogui.hotkey("ctrl", "v")
-                time.sleep(0.1)
-            finally:
-                if old_clipboard is not None:
-                    try:
-                        pyperclip.copy(old_clipboard)
-                    except Exception:
-                        pass
-        else:
+        # 短英文直接输入，速度更快
+        if len(text) <= 50 and all(ord(c) <= 127 for c in text):
             pyautogui.write(text, interval=0.02)
+            return {"ok": True, "action": "type_text", "text": text}
+        # 长文本或中文使用剪贴板粘贴，速度更快
+        try:
+            old_clipboard = pyperclip.paste()
+        except Exception:
+            old_clipboard = None
+        try:
+            pyperclip.copy(text)
+            time.sleep(0.05)
+            pyautogui.hotkey("ctrl", "v")
+            time.sleep(0.1)
+        finally:
+            if old_clipboard is not None:
+                try:
+                    pyperclip.copy(old_clipboard)
+                except Exception:
+                    pass
         return {"ok": True, "action": "type_text", "text": text}
 
     def press_key(self, key: str) -> dict[str, Any]:
