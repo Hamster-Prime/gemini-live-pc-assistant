@@ -125,6 +125,7 @@ python main.py
 | `reconnect_initial_delay` | `2.0` | 重连初始延迟（秒） |
 | `reconnect_max_delay` | `12.0` | 重连最大延迟（秒） |
 | `screenshot_dir` | `runtime/screenshots` | 截图保存目录 |
+| `max_screenshots` | `50` | 最大截图保留数量 |
 
 ## 项目结构
 
