@@ -347,13 +347,32 @@ class SettingsWindow:
                 if isinstance(field_default, (int, float)) and not isinstance(field_default, bool):
                     try:
                         if isinstance(field_default, int):
-                            int(value)
+                            num_value = int(value)
                         else:
-                            float(value)
+                            num_value = float(value)
                     except (ValueError, TypeError):
                         if self._root:
                             self._root.title(f"字段 {key} 必须是数字")
                         return
+
+                    # Range validation
+                    range_limits = {
+                        "vad_threshold": (0, 10000),
+                        "vad_multiplier": (1.0, 10.0),
+                        "vad_attack_ms": (10, 2000),
+                        "vad_release_ms": (100, 5000),
+                        "pre_roll_ms": (0, 2000),
+                        "manual_listen_timeout": (1.0, 60.0),
+                        "chunk_ms": (10, 200),
+                        "reconnect_initial_delay": (0.5, 60.0),
+                        "reconnect_max_delay": (1.0, 300.0),
+                    }
+                    if key in range_limits:
+                        min_val, max_val = range_limits[key]
+                        if not (min_val <= num_value <= max_val):
+                            if self._root:
+                                self._root.title(f"字段 {key} 必须在 {min_val}~{max_val} 之间")
+                            return
 
             new_config = self._config_manager.update(**updates)
             self._config = new_config
