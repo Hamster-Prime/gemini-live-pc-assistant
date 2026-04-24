@@ -280,11 +280,32 @@ class MainWindow:
 
     def _create_text_panel(self, panes: ttk.PanedWindow, title: str) -> tk.Text:
         frame = ttk.LabelFrame(panes, text=title, padding=8)
-        text = tk.Text(frame, height=12, wrap=tk.WORD, state=tk.DISABLED)
+        # 创建文本控件，允许选择但禁止编辑
+        text = tk.Text(frame, height=12, wrap=tk.WORD, state=tk.DISABLED, exportselection=True, takefocus=True)
         scrollbar = ttk.Scrollbar(frame, orient=tk.VERTICAL, command=text.yview)
         text.configure(yscrollcommand=scrollbar.set)
         text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        
+        # 添加右键菜单
+        def show_context_menu(event):
+            try:
+                menu = tk.Menu(text, tearoff=0)
+                # 只有选中文本时才显示复制选项
+                if text.tag_ranges(tk.SEL):
+                    menu.add_command(label="复制", command=lambda: text.event_generate("<<Copy>>"))
+                menu.add_command(label="全选", command=lambda: text.tag_add(tk.SEL, "1.0", tk.END))
+                menu.tk_popup(event.x_root, event.y_root)
+            finally:
+                menu.grab_release()
+        
+        # 绑定右键菜单
+        text.bind("<Button-3>", show_context_menu)
+        # 允许用键盘快捷键复制（Ctrl+C）
+        text.bind("<Control-c>", lambda e: text.event_generate("<<Copy>>") if text.tag_ranges(tk.SEL) else None)
+        # 允许用键盘快捷键全选（Ctrl+A）
+        text.bind("<Control-a>", lambda e: (text.tag_add(tk.SEL, "1.0", tk.END), "break"))
+        
         panes.add(frame, weight=1)
         return text
 
