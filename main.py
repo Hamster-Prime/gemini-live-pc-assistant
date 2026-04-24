@@ -142,6 +142,7 @@ class AssistantApp:
         self._floating_status = FloatingStatusWindow(
             config_getter=self.get_config,
             config_manager=self._config_manager,
+            on_double_click=self._show_main_window,
         )
         self._floating_status.start()
 

@@ -430,9 +430,10 @@ class SettingsWindow:
 class FloatingStatusWindow:
     """半透明悬浮窗，显示当前状态、用户和助手文本。"""
 
-    def __init__(self, config_getter: Callable[[], AppConfig], config_manager: "ConfigManager | None" = None) -> None:
+    def __init__(self, config_getter: Callable[[], AppConfig], config_manager: "ConfigManager | None" = None, on_double_click: Callable[[], None] | None = None) -> None:
         self._config_getter = config_getter
         self._config_manager = config_manager
+        self._on_double_click = on_double_click
         self._root: tk.Tk | None = None
         self._thread: threading.Thread | None = None
         self._state_label: tk.Label | None = None
@@ -501,6 +502,9 @@ class FloatingStatusWindow:
         self._root.bind("<Button-1>", self._on_drag_start)
         self._root.bind("<B1-Motion>", self._on_drag_motion)
         self._root.bind("<ButtonRelease-1>", self._on_drag_end)
+        # 双击事件支持
+        if self._on_double_click:
+            self._root.bind("<Double-Button-1>", self._on_double_click_handler)
 
         # 状态标签
         self._state_label = tk.Label(
@@ -565,6 +569,14 @@ class FloatingStatusWindow:
                 ConfigManager().update(status_window_x=x, status_window_y=y)
         except Exception:
             pass
+    
+    def _on_double_click_handler(self, event: tk.Event) -> None:
+        """双击事件处理"""
+        try:
+            if self._on_double_click:
+                self._on_double_click()
+        except Exception:
+            LOGGER.exception("处理双击事件失败")
 
     def _update_label(self, label: tk.Label | None, text: str, fg: str) -> None:
         if label is None or self._root is None:
