@@ -69,6 +69,7 @@ class AudioStreamManager:
         self._playback_generation = 0
         self._playback_lock = threading.Lock()
         self._output_active = False
+        self._output_active_lock = threading.Lock()
 
     def add_input_listener(self, callback: Callable[[bytes], None]) -> None:
         self._listeners.append(callback)
@@ -81,23 +82,28 @@ class AudioStreamManager:
             return
 
         self._running.set()
-        self._input_stream = self._audio.open(
-            format=pyaudio.paInt16,
-            channels=1,
-            rate=self.input_device_rate,
-            input=True,
-            input_device_index=self.input_device_index,
-            frames_per_buffer=self.input_frames,
-        )
-        self._output_stream = self._audio.open(
-            format=pyaudio.paInt16,
-            channels=1,
-            rate=self.output_device_rate,
-            output=True,
-            output_device_index=self.output_device_index,
-            frames_per_buffer=self.output_frames,
-            stream_callback=self._output_callback,
-        )
+        try:
+            self._input_stream = self._audio.open(
+                format=pyaudio.paInt16,
+                channels=1,
+                rate=self.input_device_rate,
+                input=True,
+                input_device_index=self.input_device_index,
+                frames_per_buffer=self.input_frames,
+            )
+            self._output_stream = self._audio.open(
+                format=pyaudio.paInt16,
+                channels=1,
+                rate=self.output_device_rate,
+                output=True,
+                output_device_index=self.output_device_index,
+                frames_per_buffer=self.output_frames,
+                stream_callback=self._output_callback,
+            )
+        except Exception:
+            LOGGER.exception("初始化音频流失败")
+            self._running.clear()
+            raise
 
         self._input_thread = threading.Thread(target=self._input_loop, daemon=True)
         self._input_thread.start()
@@ -139,7 +145,8 @@ class AudioStreamManager:
                     return
             self._output_buffer.extend(audio_bytes)
             self._last_output_data_time = time.monotonic()
-            self._output_active = True
+            with self._output_active_lock:
+                self._output_active = True
 
     def clear_output(self) -> None:
         with self._playback_lock:
@@ -149,18 +156,22 @@ class AudioStreamManager:
             self._output_buffer.clear()
             self._output_primed = False
 
-        if self._output_active:
+        with self._output_active_lock:
+            was_active = self._output_active
             self._output_active = False
+        if was_active:
             self._notify_output_idle()
 
     def is_output_active(self) -> bool:
-        return self._output_active
+        with self._output_active_lock:
+            return self._output_active
 
     def _input_loop(self) -> None:
         consecutive_errors = 0
         while self._running.is_set():
             try:
-                assert self._input_stream is not None
+                if self._input_stream is None:
+                    break
                 data = self._input_stream.read(self.input_frames, exception_on_overflow=False)
                 consecutive_errors = 0
                 if self.input_device_rate != self.input_rate:
@@ -214,9 +225,10 @@ class AudioStreamManager:
 
             if time.monotonic() - self._last_output_data_time > 0.2:
                 self._output_primed = False
-                if self._output_active:
-                    self._output_active = False
-                    notify_idle = True
+                with self._output_active_lock:
+                    if self._output_active:
+                        self._output_active = False
+                        notify_idle = True
 
         if notify_idle:
             self._notify_output_idle()

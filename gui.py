@@ -41,12 +41,14 @@ class MainWindow:
         on_toggle_listen: Callable[[], None],
         on_settings: Callable[[], None],
         on_exit: Callable[[], None],
+        on_toggle_mute: Callable[[], None] | None = None,
     ) -> None:
         self._config_getter = config_getter
         self._status_getter = status_getter
         self._on_toggle_listen = on_toggle_listen
         self._on_settings = on_settings
         self._on_exit = on_exit
+        self._on_toggle_mute = on_toggle_mute
         self._root: tk.Tk | None = None
         self._thread: threading.Thread | None = None
         self._state_label: ttk.Label | None = None
@@ -54,6 +56,7 @@ class MainWindow:
         self._user_text: tk.Text | None = None
         self._assistant_text: tk.Text | None = None
         self._toggle_button: ttk.Button | None = None
+        self._mute_button: ttk.Button | None = None
         self._alive = False
 
     def start(self) -> None:
@@ -93,6 +96,23 @@ class MainWindow:
         label = "停止聆听" if listening else "开始聆听"
         self._root.after(0, lambda: self._toggle_button.configure(text=label))
 
+    def set_muted(self, muted: bool) -> None:
+        if self._root is None or self._mute_button is None:
+            return
+        label = "取消静音" if muted else "静音"
+        self._root.after(0, lambda: self._mute_button.configure(text=label))
+
+    def _clear_conversations(self) -> None:
+        """清空对话历史显示。"""
+        for widget in (self._user_text, self._assistant_text):
+            if widget is not None:
+                try:
+                    widget.configure(state=tk.NORMAL)
+                    widget.delete("1.0", tk.END)
+                    widget.configure(state=tk.DISABLED)
+                except tk.TclError:
+                    pass
+
     def _run(self) -> None:
         self._root = tk.Tk()
         self._root.title("Gemini Live PC Assistant")
@@ -119,7 +139,13 @@ class MainWindow:
         actions.pack(fill=tk.X)
         self._toggle_button = ttk.Button(actions, text="开始聆听", command=self._on_toggle_listen)
         self._toggle_button.pack(side=tk.LEFT)
+        if self._on_toggle_mute:
+            self._mute_button = ttk.Button(actions, text="静音", command=self._on_toggle_mute)
+            self._mute_button.pack(side=tk.LEFT, padx=4)
+        else:
+            self._mute_button = None
         ttk.Button(actions, text="设置", command=self._on_settings).pack(side=tk.LEFT, padx=8)
+        ttk.Button(actions, text="清空对话", command=self._clear_conversations).pack(side=tk.LEFT, padx=4)
         ttk.Button(actions, text="隐藏到托盘", command=self._hide_to_tray).pack(side=tk.LEFT)
         ttk.Button(actions, text="退出", command=self._on_exit).pack(side=tk.RIGHT)
 
@@ -309,6 +335,21 @@ class SettingsWindow:
             for key, entry in self._entries.items():
                 updates[key] = entry.get()
 
+            # Validate numeric fields before saving
+            default = AppConfig()
+            for key, value in updates.items():
+                field_default = getattr(default, key, None)
+                if isinstance(field_default, (int, float)) and not isinstance(field_default, bool):
+                    try:
+                        if isinstance(field_default, int):
+                            int(value)
+                        else:
+                            float(value)
+                    except (ValueError, TypeError):
+                        if self._root:
+                            self._root.title(f"字段 {key} 必须是数字")
+                        return
+
             new_config = self._config_manager.update(**updates)
             self._config = new_config
             self._on_save(new_config)
@@ -409,6 +450,7 @@ class FloatingStatusWindow:
         # 拖拽支持
         self._root.bind("<Button-1>", self._on_drag_start)
         self._root.bind("<B1-Motion>", self._on_drag_motion)
+        self._root.bind("<ButtonRelease-1>", self._on_drag_end)
 
         # 状态标签
         self._state_label = tk.Label(
@@ -459,6 +501,20 @@ class FloatingStatusWindow:
         x = self._root.winfo_x() + dx
         y = self._root.winfo_y() + dy
         self._root.geometry(f"+{x}+{y}")
+
+    def _on_drag_end(self, event: tk.Event) -> None:
+        """拖拽结束时保存窗口位置。"""
+        if self._root is None:
+            return
+        try:
+            from config import ConfigManager
+            cm = ConfigManager()
+            cm.update(
+                status_window_x=self._root.winfo_x(),
+                status_window_y=self._root.winfo_y(),
+            )
+        except Exception:
+            pass
 
     def _update_label(self, label: tk.Label | None, text: str, fg: str) -> None:
         if label is None or self._root is None:

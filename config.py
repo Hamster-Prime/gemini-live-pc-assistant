@@ -4,7 +4,7 @@ import json
 import logging
 import os
 import threading
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, fields
 from pathlib import Path
 from typing import Any
 
@@ -68,7 +68,7 @@ class ConfigManager:
             config = AppConfig()
             for key, value in data.items():
                 if hasattr(config, key):
-                    setattr(config, key, value)
+                    setattr(config, key, self._coerce_value(getattr(config, key), value))
 
             if not config.api_key:
                 config.api_key = os.getenv("GEMINI_API_KEY", "").strip()
@@ -93,16 +93,20 @@ class ConfigManager:
 
     @staticmethod
     def _coerce_value(current: Any, value: Any) -> Any:
-        if isinstance(current, bool):
-            if isinstance(value, str):
-                return value.strip().lower() in {"1", "true", "yes", "on"}
-            return bool(value)
+        try:
+            if isinstance(current, bool):
+                if isinstance(value, str):
+                    return value.strip().lower() in {"1", "true", "yes", "on"}
+                return bool(value)
 
-        if isinstance(current, int) and not isinstance(current, bool):
-            return int(value)
+            if isinstance(current, int) and not isinstance(current, bool):
+                return int(value)
 
-        if isinstance(current, float):
-            return float(value)
+            if isinstance(current, float):
+                return float(value)
 
-        return value
+            return value
+        except (ValueError, TypeError):
+            LOGGER.warning("配置值转换失败: %r -> %r，使用默认值", value, current)
+            return current
 

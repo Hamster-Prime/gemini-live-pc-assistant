@@ -1,12 +1,33 @@
+# Python
 __pycache__/
-*.pyc
-*.pyo
-*.pyd
-.Python
-.venv/
-venv/
-build/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
 dist/
-assistant_config.json
-runtime/
+build/
+*.egg
 
+# Virtual environment
+venv/
+.venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Runtime
+runtime/
+assistant_config.json
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log

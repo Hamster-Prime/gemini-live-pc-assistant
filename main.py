@@ -6,10 +6,13 @@
 from __future__ import annotations
 
 import logging
+import logging.handlers
+import signal
 import sys
 import threading
 import time
 from collections.abc import Callable
+from pathlib import Path
 
 import keyboard
 
@@ -24,15 +27,80 @@ from wake_word import EnergyVadWakeDetector
 
 LOGGER = logging.getLogger(__name__)
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-    datefmt="%H:%M:%S",
-)
+
+def _setup_logging() -> None:
+    """配置日志：控制台 + 滚动文件。"""
+    log_dir = Path(__file__).parent / "runtime" / "logs"
+    log_dir.mkdir(parents=True, exist_ok=True)
+    log_file = log_dir / "assistant.log"
+
+    root = logging.getLogger()
+    root.setLevel(logging.INFO)
+
+    # Console handler
+    console = logging.StreamHandler(sys.stdout)
+    console.setLevel(logging.INFO)
+    console.setFormatter(logging.Formatter(
+        "%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+        datefmt="%H:%M:%S",
+    ))
+    root.addHandler(console)
+
+    # File handler (10MB, keep 3 backups)
+    file_handler = logging.handlers.RotatingFileHandler(
+        log_file, maxBytes=10 * 1024 * 1024, backupCount=3, encoding="utf-8",
+    )
+    file_handler.setLevel(logging.DEBUG)
+    file_handler.setFormatter(logging.Formatter(
+        "%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    ))
+    root.addHandler(file_handler)
+
+
+_setup_logging()
+
+
+def _check_dependencies() -> None:
+    """检查必要的依赖是否已安装。"""
+    required = [
+        ("pyaudio", "PyAudio"),
+        ("pyautogui", "pyautogui"),
+        ("pystray", "pystray"),
+        ("PIL", "Pillow"),
+        ("keyboard", "keyboard"),
+        ("numpy", "numpy"),
+        ("google.genai", "google-genai"),
+    ]
+    optional = [
+        ("pyperclip", "pyperclip"),
+        ("pycaw", "pycaw"),
+        ("comtypes", "comtypes"),
+        ("psutil", "psutil"),
+    ]
+    missing = []
+    for module, package in required:
+        try:
+            __import__(module)
+        except ImportError:
+            missing.append(package)
+    if missing:
+        LOGGER.error("缺少必要依赖: %s，请运行: pip install %s", ", ".join(missing), " ".join(missing))
+        sys.exit(1)
+    for module, package in optional:
+        try:
+            __import__(module)
+        except ImportError:
+            LOGGER.warning("可选依赖 %s 未安装，部分功能不可用: pip install %s", package, package)
+
+
+_check_dependencies()
 
 
 class AssistantApp:
     """主应用类，协调所有子系统。"""
+
+    VERSION = "1.1.0"
 
     def __init__(self) -> None:
         self._config_manager = ConfigManager()
@@ -53,6 +121,7 @@ class AssistantApp:
         self._listening = False
         self._manual_mode = False
         self._manual_timer: threading.Timer | None = None
+        self._muted = False
         self._lock = threading.Lock()
 
     # ------------------------------------------------------------------
@@ -61,7 +130,11 @@ class AssistantApp:
 
     def run(self) -> None:
         """启动应用主循环。"""
-        LOGGER.info("正在启动 Gemini Live PC Assistant ...")
+        LOGGER.info("正在启动 Gemini Live PC Assistant v%s ...", self.VERSION)
+
+        # Register signal handlers for graceful shutdown
+        signal.signal(signal.SIGINT, self._signal_handler)
+        signal.signal(signal.SIGTERM, self._signal_handler)
 
         self._init_audio()
         self._init_wake_detector()
@@ -77,6 +150,7 @@ class AssistantApp:
             on_toggle_listen=self._on_hotkey_pressed,
             on_settings=self._open_settings,
             on_exit=self._exit,
+            on_toggle_mute=self.toggle_mute,
         )
         self._main_window.start()
 
@@ -141,6 +215,13 @@ class AssistantApp:
         except Exception:
             LOGGER.exception("注册热键 %s 失败", hotkey)
 
+        # Register mute hotkey (Ctrl+M)
+        try:
+            keyboard.add_hotkey("ctrl+m", self.toggle_mute, suppress=False)
+            LOGGER.info("已注册静音热键：ctrl+m")
+        except Exception:
+            LOGGER.exception("注册静音热键失败")
+
     # ------------------------------------------------------------------
     # 配置访问（供回调使用）
     # ------------------------------------------------------------------
@@ -158,6 +239,9 @@ class AssistantApp:
     def _on_mic_chunk(self, chunk: bytes) -> None:
         """麦克风数据到达：VAD 检测 → 唤醒词 → 发送到 Gemini。"""
         if self._wake_detector is None:
+            return
+
+        if self._muted:
             return
 
         if self._manual_mode:
@@ -326,6 +410,20 @@ class AssistantApp:
         if self._main_window:
             self._main_window.show()
 
+    def toggle_mute(self) -> None:
+        """切换麦克风静音状态。"""
+        self._muted = not self._muted
+        state = "已静音" if self._muted else "已取消静音"
+        LOGGER.info(state)
+        if self._floating_status:
+            self._floating_status.set_status_text(state)
+        if self._main_window:
+            self._main_window.set_status_text(state)
+            self._main_window.set_muted(self._muted)
+
+    def is_muted(self) -> bool:
+        return self._muted
+
     def _on_settings_saved(self, new_config: AppConfig) -> None:
         self._config = new_config
         self._tool_registry = ToolRegistry(new_config)
@@ -363,6 +461,11 @@ class AssistantApp:
         LOGGER.info("收到退出请求，正在关闭托盘 ...")
         if self._tray:
             self._tray.stop()
+
+    def _signal_handler(self, signum: int, frame: object) -> None:
+        """信号处理：优雅退出。"""
+        LOGGER.info("收到信号 %d，正在退出 ...", signum)
+        self._exit()
 
     # ------------------------------------------------------------------
     # 清理

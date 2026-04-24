@@ -4,6 +4,7 @@ import asyncio
 import base64
 import json
 import logging
+import random
 import re
 import threading
 from collections.abc import Callable
@@ -116,7 +117,7 @@ class GeminiLiveSession:
                 self._session = None
                 self._notify_connection(False)
                 self._notify_status(f"Gemini 连接断开，{delay:.0f} 秒后重连：{exc}")
-                await asyncio.sleep(delay)
+                await asyncio.sleep(delay + random.uniform(0, delay * 0.3))
                 delay = min(delay * 2, config.reconnect_max_delay)
 
     async def _connect_once(self, config: AppConfig, api_key: str) -> None:
@@ -155,25 +156,33 @@ class GeminiLiveSession:
     async def _sender_loop(self, session: Any) -> None:
         assert self._sender_queue is not None
         while not self._stop_event.is_set():
-            message = await self._sender_queue.get()
+            try:
+                message = await self._sender_queue.get()
+            except asyncio.CancelledError:
+                break
             kind = message["kind"]
 
-            if kind == "audio":
-                config = self._config_getter()
-                await session.send_realtime_input(
-                    audio=types.Blob(
-                        data=message["data"],
-                        mime_type=f"audio/pcm;rate={config.input_rate}",
+            try:
+                if kind == "audio":
+                    config = self._config_getter()
+                    await session.send_realtime_input(
+                        audio=types.Blob(
+                            data=message["data"],
+                            mime_type=f"audio/pcm;rate={config.input_rate}",
+                        )
                     )
-                )
-            elif kind == "activity_start":
-                await session.send_realtime_input(activity_start=types.ActivityStart())
-            elif kind == "activity_end":
-                await session.send_realtime_input(activity_end=types.ActivityEnd())
-            elif kind == "audio_stream_end":
-                await session.send_realtime_input(audio_stream_end=True)
-            elif kind == "function_response":
-                await session.send_tool_response(function_responses=message["responses"])
+                elif kind == "activity_start":
+                    await session.send_realtime_input(activity_start=types.ActivityStart())
+                elif kind == "activity_end":
+                    await session.send_realtime_input(activity_end=types.ActivityEnd())
+                elif kind == "audio_stream_end":
+                    await session.send_realtime_input(audio_stream_end=True)
+                elif kind == "function_response":
+                    await session.send_tool_response(function_responses=message["responses"])
+            except asyncio.CancelledError:
+                break
+            except Exception:
+                LOGGER.exception("发送消息到 Gemini 失败 (kind=%s)", kind)
 
     async def _receiver_loop(self, session: Any) -> None:
         async for response in session.receive():
@@ -234,7 +243,13 @@ class GeminiLiveSession:
         for function_call in function_calls:
             args = self._normalize_function_args(getattr(function_call, "args", None))
             try:
-                result = await asyncio.to_thread(tool_registry.execute, function_call.name, args)
+                result = await asyncio.wait_for(
+                    asyncio.to_thread(tool_registry.execute, function_call.name, args),
+                    timeout=30.0,
+                )
+            except asyncio.TimeoutError:
+                LOGGER.warning("工具 %s 执行超时 (30s)", function_call.name)
+                result = {"ok": False, "error": f"工具 {function_call.name} 执行超时"}
             except Exception as exc:
                 LOGGER.exception("执行工具 %s 失败", function_call.name)
                 result = {"ok": False, "error": str(exc)}
@@ -268,6 +283,7 @@ class GeminiLiveSession:
 
     async def _close_current_session(self) -> None:
         session = self._session
+        self._session = None
         if session is None:
             return
         try:
@@ -278,10 +294,30 @@ class GeminiLiveSession:
     @staticmethod
     def _build_live_config(config: AppConfig, tool_registry: ToolRegistry) -> dict[str, Any]:
         system_text = (
-            "你是一个 Windows 电脑语音助手。用户会通过中文语音让你操控电脑。"
-            "请优先使用工具执行鼠标、键盘与应用控制。"
-            "在执行危险操作前先用中文简短确认。"
-            f"当前助手唤醒词偏好为：{config.wake_word}。"
+            "你是一个 Windows 电脑语音助手。\n"
+            "用户通过中文语音与你交互，让你操控电脑完成各种任务。\n"
+            "\n"
+            "## 核心能力\n"
+            "- 鼠标控制：点击、双击、右键、移动、滚轮、拖拽\n"
+            "- 键盘控制：输入文本（支持中文）、按键、组合键、按键序列\n"
+            "- 应用管理：打开、关闭应用程序\n"
+            "- 窗口管理：最小化、最大化、恢复、聚焦窗口\n"
+            "- 系统控制：调节音量、锁屏\n"
+            "- 信息获取：截屏、屏幕信息、鼠标位置、剪贴板、像素颜色\n"
+            "- 文件操作：读写文件、列出目录\n"
+            "- 网络操作：打开 URL、搜索网页\n"
+            "- 进程管理：列出进程、结束进程\n"
+            "- 系统信息：查看系统状态、运行命令\n"
+            "- 便捷操作：全选、撤销、重做、复制、粘贴、保存、新建标签等\n"
+            "\n"
+            "## 交互规则\n"
+            "1. 用简短中文回复，语气友好自然\n"
+            "2. 执行操作前简要说明要做什么\n"
+            "3. 执行后确认结果\n"
+            "4. 如果操作失败，尝试替代方案\n"
+            "5. 危险操作（如关闭应用、删除文件、执行命令）前先确认\n"
+            "6. 如果用户意图不明确，主动询问\n"
+            f"\n当前唤醒词偏好：{config.wake_word}。"
         )
         return {
             "response_modalities": ["AUDIO"],
