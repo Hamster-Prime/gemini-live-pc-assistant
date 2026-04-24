@@ -98,7 +98,7 @@ _check_dependencies()
 class AssistantApp:
     """主应用类,协调所有子系统。"""
 
-    VERSION = "1.2.0"
+    VERSION = "1.3.0"
 
     def __init__(self) -> None:
         self._config_manager = ConfigManager()
