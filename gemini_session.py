@@ -231,7 +231,7 @@ class GeminiLiveSession:
             time_left = getattr(go_away, "time_left", None)
             if time_left is not None:
                 self._notify_status(f"服务端提示会话即将结束，剩余 {time_left} 秒，准备重连。")
-            asyncio.get_event_loop().call_later(max(1.0, float(time_left or 2)), self._trigger_reconnect)
+            asyncio.get_running_loop().call_later(max(1.0, float(time_left or 2)), self._trigger_reconnect)
 
     async def _handle_tool_call(self, session: Any, tool_call: Any) -> None:
         function_calls = getattr(tool_call, "function_calls", None) or []
