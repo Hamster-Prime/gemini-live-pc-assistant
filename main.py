@@ -192,6 +192,14 @@ class AssistantApp:
 
     def _init_wake_detector(self) -> None:
         cfg = self._config
+        _last_vol_update = [0.0]
+        def on_volume_update(volume: int) -> None:
+            now = time.monotonic()
+            if now - _last_vol_update[0] < 0.2:
+                return
+            _last_vol_update[0] = now
+            if self._main_window:
+                self._main_window.update_volume(volume)
         self._wake_detector = EnergyVadWakeDetector(
             threshold=cfg.vad_threshold,
             multiplier=cfg.vad_multiplier,
@@ -199,6 +207,7 @@ class AssistantApp:
             release_ms=cfg.vad_release_ms,
             pre_roll_ms=cfg.pre_roll_ms,
             chunk_ms=cfg.chunk_ms,
+            volume_callback=on_volume_update,
         )
 
     def _init_gemini(self) -> None:
@@ -575,8 +584,7 @@ class AssistantApp:
             LOGGER.info("已清空对话历史")
             if self._floating_status:
                 self._floating_status.set_status_text("对话历史已清空")
-            if self._main_window:
-                self._main_window.set_status_text("对话历史已清空")
+            self._main_window.set_status_text("对话历史已清空")
 
     def restart_gemini_session(self) -> None:
         """重启Gemini会话"""
@@ -615,25 +623,34 @@ class AssistantApp:
             if self._main_window:
                 self._main_window.set_status_text("代理配置已更新，正在重启会话...")
 
-        # 重建唤醒检测器，添加音量回调（节流：每200ms最多更新一次）
-        _last_vol_update = [0.0]  # mutable container for closure
-        def on_volume_update(volume: int) -> None:
-            now = time.monotonic()
-            if now - _last_vol_update[0] < 0.2:
-                return
-            _last_vol_update[0] = now
-            if self._main_window:
-                self._main_window.update_volume(volume)
-        
-        self._wake_detector = EnergyVadWakeDetector(
-            threshold=new_config.vad_threshold,
-            multiplier=new_config.vad_multiplier,
-            attack_ms=new_config.vad_attack_ms,
-            release_ms=new_config.vad_release_ms,
-            pre_roll_ms=new_config.pre_roll_ms,
-            chunk_ms=new_config.chunk_ms,
-            volume_callback=on_volume_update,
+        # 重建唤醒检测器（仅VAD参数变更时）
+        vad_changed = (
+            old_config.vad_threshold != new_config.vad_threshold
+            or old_config.vad_multiplier != new_config.vad_multiplier
+            or old_config.vad_attack_ms != new_config.vad_attack_ms
+            or old_config.vad_release_ms != new_config.vad_release_ms
+            or old_config.pre_roll_ms != new_config.pre_roll_ms
+            or old_config.chunk_ms != new_config.chunk_ms
         )
+        if vad_changed:
+            _last_vol_update = [0.0]
+            def on_volume_update(volume: int) -> None:
+                now = time.monotonic()
+                if now - _last_vol_update[0] < 0.2:
+                    return
+                _last_vol_update[0] = now
+                if self._main_window:
+                    self._main_window.update_volume(volume)
+            
+            self._wake_detector = EnergyVadWakeDetector(
+                threshold=new_config.vad_threshold,
+                multiplier=new_config.vad_multiplier,
+                attack_ms=new_config.vad_attack_ms,
+                release_ms=new_config.vad_release_ms,
+                pre_roll_ms=new_config.pre_roll_ms,
+                chunk_ms=new_config.chunk_ms,
+                volume_callback=on_volume_update,
+            )
 
         # 音频设备配置变更时重启音频流
         audio_changed = (
