@@ -289,7 +289,8 @@ class AssistantApp:
                 return
             self._manual_mode = True
             self._listening = True
-        self._wake_detector.reset()
+        if self._wake_detector:
+            self._wake_detector.reset()
 
         if self._gemini_session and not self._gemini_session.is_connected():
             self._gemini_session.restart()
