@@ -77,10 +77,12 @@ class ConfigManager:
 
     def save(self, config: AppConfig) -> None:
         with self._lock:
-            self.path.write_text(
+            tmp = self.path.with_suffix(".tmp")
+            tmp.write_text(
                 json.dumps(config.to_dict(), ensure_ascii=False, indent=2),
                 encoding="utf-8",
             )
+            tmp.replace(self.path)
 
     def update(self, **kwargs: Any) -> AppConfig:
         with self._lock:
