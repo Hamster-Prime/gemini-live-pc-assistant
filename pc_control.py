@@ -151,9 +151,7 @@ class PCController:
         width, height = pyautogui.size()
         x = max(0, min(int(x), width - 1))
         y = max(0, min(int(y), height - 1))
-        image = pyautogui.screenshot()
-        pixel = image.getpixel((x, y))
-        r, g, b = pixel[0], pixel[1], pixel[2]
+        r, g, b = pyautogui.pixel(x, y)
         hex_color = f"#{r:02x}{g:02x}{b:02x}"
         return {
             "ok": True,
