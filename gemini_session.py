@@ -31,6 +31,7 @@ class GeminiLiveSession:
         on_assistant_transcript: Callable[[str], None],
         on_audio_output: Callable[[bytes, int], None],
         on_turn_complete: Callable[[], None],
+        on_interrupted: Callable[[], None],
     ) -> None:
         self._config_getter = config_getter
         self._tool_registry_getter = tool_registry_getter
@@ -40,6 +41,7 @@ class GeminiLiveSession:
         self._on_assistant_transcript = on_assistant_transcript
         self._on_audio_output = on_audio_output
         self._on_turn_complete = on_turn_complete
+        self._on_interrupted = on_interrupted
 
         self._stop_event = threading.Event()
         self._connected = threading.Event()
@@ -84,6 +86,9 @@ class GeminiLiveSession:
 
     def send_activity_end(self) -> bool:
         return self._enqueue({"kind": "activity_end"}, allow_when_disconnected=False)
+
+    def send_audio_stream_end(self) -> bool:
+        return self._enqueue({"kind": "audio_stream_end"}, allow_when_disconnected=False)
 
     def _thread_main(self) -> None:
         asyncio.run(self._run())
@@ -164,6 +169,8 @@ class GeminiLiveSession:
                 await session.send_realtime_input(activity_start=types.ActivityStart())
             elif kind == "activity_end":
                 await session.send_realtime_input(activity_end=types.ActivityEnd())
+            elif kind == "audio_stream_end":
+                await session.send_realtime_input(audio_stream_end=True)
             elif kind == "function_response":
                 await session.send_tool_response(function_responses=message["responses"])
 
@@ -173,6 +180,7 @@ class GeminiLiveSession:
 
     async def _handle_response(self, session: Any, response: Any) -> None:
         server_content = getattr(response, "server_content", None)
+        emitted_audio = False
         if server_content is not None:
             input_transcription = getattr(server_content, "input_transcription", None)
             if input_transcription and getattr(input_transcription, "text", None):
@@ -188,14 +196,18 @@ class GeminiLiveSession:
                     audio_bytes, sample_rate = self._extract_audio_from_part(part)
                     if audio_bytes:
                         self._on_audio_output(audio_bytes, sample_rate)
+                        emitted_audio = True
 
                     text = getattr(part, "text", None)
                     if text:
                         self._on_assistant_transcript(str(text).strip())
 
             fallback_data = getattr(response, "data", None)
-            if fallback_data:
+            if fallback_data and not emitted_audio:
                 self._on_audio_output(self._ensure_bytes(fallback_data), self._config_getter().output_rate)
+
+            if getattr(server_content, "interrupted", False):
+                self._on_interrupted()
 
             if getattr(server_content, "turn_complete", False) or getattr(server_content, "interrupted", False):
                 self._on_turn_complete()

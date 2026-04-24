@@ -16,7 +16,7 @@ import keyboard
 from audio_stream import AudioStreamManager
 from config import AppConfig, ConfigManager
 from gemini_session import GeminiLiveSession
-from gui import FloatingStatusWindow, SettingsWindow
+from gui import FloatingStatusWindow, MainWindow, SettingsWindow
 from pc_control import PCController
 from tools import ToolRegistry
 from tray import TrayManager
@@ -46,6 +46,7 @@ class AssistantApp:
         self._gemini_session: GeminiLiveSession | None = None
 
         self._tray: TrayManager | None = None
+        self._main_window: MainWindow | None = None
         self._settings_window: SettingsWindow | None = None
         self._floating_status: FloatingStatusWindow | None = None
 
@@ -70,8 +71,17 @@ class AssistantApp:
         self._floating_status = FloatingStatusWindow(config_getter=self.get_config)
         self._floating_status.start()
 
-        self._tray = TrayManager(
+        self._main_window = MainWindow(
+            config_getter=self.get_config,
+            status_getter=self._get_status_text,
+            on_toggle_listen=self._on_hotkey_pressed,
             on_settings=self._open_settings,
+            on_exit=self._exit,
+        )
+        self._main_window.start()
+
+        self._tray = TrayManager(
+            on_settings=self._show_main_window,
             on_exit=self._exit,
             status_getter=self._get_status_text,
         )
@@ -119,6 +129,7 @@ class AssistantApp:
             on_assistant_transcript=self._on_assistant_transcript,
             on_audio_output=self._on_audio_output,
             on_turn_complete=self._on_turn_complete,
+            on_interrupted=self._on_interrupted,
         )
         self._gemini_session.start()
 
@@ -149,6 +160,11 @@ class AssistantApp:
         if self._wake_detector is None:
             return
 
+        if self._manual_mode:
+            if self._gemini_session and self._gemini_session.is_connected():
+                self._gemini_session.send_audio(chunk)
+            return
+
         decision = self._wake_detector.process(chunk)
 
         if decision.speech_started:
@@ -177,15 +193,17 @@ class AssistantApp:
 
     def _on_hotkey_pressed(self) -> None:
         """热键按下：切换手动监听模式。"""
-        with self._lock:
-            if self._manual_mode:
-                self._finish_manual_listen()
-            else:
-                self._start_manual_listen()
+        if self._manual_mode:
+            self._finish_manual_listen()
+        else:
+            self._start_manual_listen()
 
     def _start_manual_listen(self) -> None:
-        self._manual_mode = True
-        self._listening = True
+        with self._lock:
+            if self._manual_mode:
+                return
+            self._manual_mode = True
+            self._listening = True
         self._wake_detector.reset()
 
         if self._gemini_session and not self._gemini_session.is_connected():
@@ -196,6 +214,9 @@ class AssistantApp:
 
         if self._floating_status:
             self._floating_status.set_state("listening")
+        if self._main_window:
+            self._main_window.set_state("listening")
+            self._main_window.set_listening(True)
 
         # 超时自动结束
         timeout = self._config.manual_listen_timeout
@@ -206,20 +227,25 @@ class AssistantApp:
         LOGGER.info("手动监听模式已开启 (超时 %.1fs)", timeout)
 
     def _finish_manual_listen(self) -> None:
-        if not self._manual_mode:
-            return
-        self._manual_mode = False
-        self._listening = False
+        with self._lock:
+            if not self._manual_mode:
+                return
+            self._manual_mode = False
+            self._listening = False
 
-        if self._manual_timer:
-            self._manual_timer.cancel()
-            self._manual_timer = None
+            if self._manual_timer:
+                self._manual_timer.cancel()
+                self._manual_timer = None
 
         if self._gemini_session:
             self._gemini_session.send_activity_end()
+            self._gemini_session.send_audio_stream_end()
 
         if self._floating_status:
             self._floating_status.set_state("idle")
+        if self._main_window:
+            self._main_window.set_state("idle")
+            self._main_window.set_listening(False)
 
         LOGGER.info("手动监听模式已结束")
 
@@ -231,6 +257,8 @@ class AssistantApp:
         state = "connected" if connected else "disconnected"
         if self._floating_status:
             self._floating_status.set_state(state)
+        if self._main_window:
+            self._main_window.set_state(state)
         if self._tray:
             self._tray.update_status(state)
 
@@ -238,29 +266,44 @@ class AssistantApp:
         LOGGER.info("Gemini 状态: %s", message)
         if self._floating_status:
             self._floating_status.set_status_text(message)
+        if self._main_window:
+            self._main_window.set_status_text(message)
 
     def _on_user_transcript(self, text: str) -> None:
         if text:
             LOGGER.info("用户: %s", text)
             if self._floating_status:
                 self._floating_status.set_user_text(text)
+            if self._main_window:
+                self._main_window.set_user_text(text)
 
     def _on_assistant_transcript(self, text: str) -> None:
         if text:
             LOGGER.info("助手: %s", text)
             if self._floating_status:
                 self._floating_status.set_assistant_text(text)
+            if self._main_window:
+                self._main_window.set_assistant_text(text)
 
     def _on_audio_output(self, audio_bytes: bytes, sample_rate: int) -> None:
         if self._audio_stream:
             self._audio_stream.play_output(audio_bytes, sample_rate=sample_rate)
         if self._floating_status:
             self._floating_status.set_state("speaking")
+        if self._main_window:
+            self._main_window.set_state("speaking")
 
     def _on_turn_complete(self) -> None:
         LOGGER.debug("助手回合结束")
         if self._floating_status:
             self._floating_status.set_state("listening" if self._listening else "idle")
+        if self._main_window:
+            self._main_window.set_state("listening" if self._listening else "idle")
+
+    def _on_interrupted(self) -> None:
+        LOGGER.debug("收到 Gemini 中断信号，清空播放缓冲")
+        if self._audio_stream:
+            self._audio_stream.clear_output()
 
     # ------------------------------------------------------------------
     # 设置窗口
@@ -276,6 +319,10 @@ class AssistantApp:
             on_save=self._on_settings_saved,
         )
         self._settings_window.start()
+
+    def _show_main_window(self) -> None:
+        if self._main_window:
+            self._main_window.show()
 
     def _on_settings_saved(self, new_config: AppConfig) -> None:
         self._config = new_config
@@ -297,6 +344,8 @@ class AssistantApp:
 
         if self._floating_status:
             self._floating_status.set_status_text("设置已保存")
+        if self._main_window:
+            self._main_window.set_status_text("设置已保存")
 
     # ------------------------------------------------------------------
     # 状态查询
@@ -306,6 +355,12 @@ class AssistantApp:
         if self._gemini_session and self._gemini_session.is_connected():
             return "已连接"
         return "未连接"
+
+    def _exit(self) -> None:
+        """托盘菜单触发退出：停止托盘主循环，交由 finally 清理资源。"""
+        LOGGER.info("收到退出请求，正在关闭托盘 ...")
+        if self._tray:
+            self._tray.stop()
 
     # ------------------------------------------------------------------
     # 清理
@@ -321,6 +376,8 @@ class AssistantApp:
             self._audio_stream.stop()
         if self._floating_status:
             self._floating_status.stop()
+        if self._main_window:
+            self._main_window.stop()
         LOGGER.info("已退出")
 
 

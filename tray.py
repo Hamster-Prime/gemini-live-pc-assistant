@@ -86,6 +86,11 @@ class TrayManager:
             self._icon.title = f"Gemini Live - {label}"
             # pystray MenuItem 不支持动态文本，通过 icon title 传达状态
 
+    def stop(self) -> None:
+        """停止托盘图标主循环。"""
+        if self._icon is not None:
+            self._icon.stop()
+
     def _on_settings_click(self, icon: pystray.Icon, item: pystray.MenuItem) -> None:
         try:
             self._on_settings()

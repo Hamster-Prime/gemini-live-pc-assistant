@@ -1,4 +1,4 @@
-"""GUI 模块 - 设置窗口与悬浮状态窗口。"""
+"""GUI 模块 - 主窗口、设置窗口与悬浮状态窗口。"""
 
 from __future__ import annotations
 
@@ -11,6 +11,186 @@ from collections.abc import Callable
 from config import AppConfig, ConfigManager
 
 LOGGER = logging.getLogger(__name__)
+
+
+_STATE_LABELS = {
+    "connected": "已连接",
+    "listening": "聆听中",
+    "speaking": "播放中",
+    "disconnected": "未连接",
+    "idle": "待机",
+}
+
+_STATE_COLORS = {
+    "connected": "#2E7D32",
+    "listening": "#1565C0",
+    "speaking": "#F9A825",
+    "disconnected": "#757575",
+    "idle": "#455A64",
+}
+
+
+class MainWindow:
+    """完整主界面，显示状态、对话和常用操作。"""
+
+    def __init__(
+        self,
+        *,
+        config_getter: Callable[[], AppConfig],
+        status_getter: Callable[[], str],
+        on_toggle_listen: Callable[[], None],
+        on_settings: Callable[[], None],
+        on_exit: Callable[[], None],
+    ) -> None:
+        self._config_getter = config_getter
+        self._status_getter = status_getter
+        self._on_toggle_listen = on_toggle_listen
+        self._on_settings = on_settings
+        self._on_exit = on_exit
+        self._root: tk.Tk | None = None
+        self._thread: threading.Thread | None = None
+        self._state_label: ttk.Label | None = None
+        self._status_var: tk.StringVar | None = None
+        self._user_text: tk.Text | None = None
+        self._assistant_text: tk.Text | None = None
+        self._toggle_button: ttk.Button | None = None
+        self._alive = False
+
+    def start(self) -> None:
+        if self._alive:
+            return
+        self._alive = True
+        self._thread = threading.Thread(target=self._run, daemon=True)
+        self._thread.start()
+
+    def stop(self) -> None:
+        self._alive = False
+        if self._root:
+            try:
+                self._root.after(0, self._root.destroy)
+            except Exception:
+                pass
+
+    def set_state(self, state: str) -> None:
+        if self._root is None or self._state_label is None:
+            return
+        self._root.after(0, lambda: self._apply_state(state))
+
+    def set_status_text(self, text: str) -> None:
+        if self._root is None or self._status_var is None:
+            return
+        self._root.after(0, lambda: self._status_var.set(text))
+
+    def set_user_text(self, text: str) -> None:
+        self._append_text(self._user_text, text)
+
+    def set_assistant_text(self, text: str) -> None:
+        self._append_text(self._assistant_text, text)
+
+    def set_listening(self, listening: bool) -> None:
+        if self._root is None or self._toggle_button is None:
+            return
+        label = "停止聆听" if listening else "开始聆听"
+        self._root.after(0, lambda: self._toggle_button.configure(text=label))
+
+    def _run(self) -> None:
+        self._root = tk.Tk()
+        self._root.title("Gemini Live PC Assistant")
+        self._root.geometry("720x520")
+        self._root.minsize(620, 420)
+        self._root.protocol("WM_DELETE_WINDOW", self._hide_to_tray)
+        self._status_var = tk.StringVar(self._root, value="正在启动 ...")
+
+        style = ttk.Style(self._root)
+        style.configure("Title.TLabel", font=("Microsoft YaHei UI", 16, "bold"))
+        style.configure("State.TLabel", font=("Microsoft YaHei UI", 11, "bold"), padding=8)
+
+        header = ttk.Frame(self._root, padding=(16, 14, 16, 8))
+        header.pack(fill=tk.X)
+        ttk.Label(header, text="Gemini Live PC Assistant", style="Title.TLabel").pack(side=tk.LEFT)
+        self._state_label = ttk.Label(header, text="初始化", style="State.TLabel")
+        self._state_label.pack(side=tk.RIGHT)
+
+        status_frame = ttk.LabelFrame(self._root, text="状态", padding=12)
+        status_frame.pack(fill=tk.X, padx=16, pady=(0, 10))
+        ttk.Label(status_frame, textvariable=self._status_var, wraplength=650).pack(fill=tk.X)
+
+        actions = ttk.Frame(self._root, padding=(16, 0, 16, 10))
+        actions.pack(fill=tk.X)
+        self._toggle_button = ttk.Button(actions, text="开始聆听", command=self._on_toggle_listen)
+        self._toggle_button.pack(side=tk.LEFT)
+        ttk.Button(actions, text="设置", command=self._on_settings).pack(side=tk.LEFT, padx=8)
+        ttk.Button(actions, text="隐藏到托盘", command=self._hide_to_tray).pack(side=tk.LEFT)
+        ttk.Button(actions, text="退出", command=self._on_exit).pack(side=tk.RIGHT)
+
+        panes = ttk.PanedWindow(self._root, orient=tk.HORIZONTAL)
+        panes.pack(fill=tk.BOTH, expand=True, padx=16, pady=(0, 16))
+        self._user_text = self._create_text_panel(panes, "用户")
+        self._assistant_text = self._create_text_panel(panes, "助手")
+
+        cfg = self._config_getter()
+        self._status_var.set(f"热键: {cfg.hotkey}    模型: {cfg.model}")
+        self._poll_status()
+        self._root.mainloop()
+        self._alive = False
+
+    def _create_text_panel(self, panes: ttk.PanedWindow, title: str) -> tk.Text:
+        frame = ttk.LabelFrame(panes, text=title, padding=8)
+        text = tk.Text(frame, height=12, wrap=tk.WORD, state=tk.DISABLED)
+        scrollbar = ttk.Scrollbar(frame, orient=tk.VERTICAL, command=text.yview)
+        text.configure(yscrollcommand=scrollbar.set)
+        text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        panes.add(frame, weight=1)
+        return text
+
+    def _append_text(self, widget: tk.Text | None, text: str) -> None:
+        if self._root is None or widget is None or not text:
+            return
+        self._root.after(0, lambda: self._apply_text(widget, text))
+
+    @staticmethod
+    def _apply_text(widget: tk.Text, text: str) -> None:
+        try:
+            widget.configure(state=tk.NORMAL)
+            widget.insert(tk.END, text.strip() + "\n\n")
+            widget.see(tk.END)
+            widget.configure(state=tk.DISABLED)
+        except tk.TclError:
+            pass
+
+    def _apply_state(self, state: str) -> None:
+        if self._state_label is None:
+            return
+        self._state_label.configure(
+            text=_STATE_LABELS.get(state, state),
+            foreground=_STATE_COLORS.get(state, "#455A64"),
+        )
+
+    def _poll_status(self) -> None:
+        if not self._alive or self._root is None:
+            return
+        try:
+            if self._status_var is not None:
+                self._status_var.set(self._status_getter())
+        except Exception:
+            LOGGER.exception("刷新主窗口状态失败")
+        self._root.after(1000, self._poll_status)
+
+    def _hide_to_tray(self) -> None:
+        if self._root is not None:
+            self._root.withdraw()
+
+    def show(self) -> None:
+        if self._root is None:
+            self.start()
+            return
+        self._root.after(0, self._show_now)
+
+    def _show_now(self) -> None:
+        if self._root is not None:
+            self._root.deiconify()
+            self._root.lift()
 
 
 # ======================================================================

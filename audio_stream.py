@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import logging
-import queue
 import threading
+import time
 from collections.abc import Callable
 
 import numpy as np
@@ -22,7 +22,8 @@ def resample_pcm16(audio_bytes: bytes, src_rate: int, dst_rate: int) -> bytes:
 
     src_positions = np.arange(samples.size, dtype=np.float32)
     dst_size = max(1, int(samples.size * dst_rate / src_rate))
-    dst_positions = np.linspace(0, samples.size - 1, dst_size, dtype=np.float32)
+    dst_positions = np.arange(dst_size, dtype=np.float32) * (src_rate / dst_rate)
+    dst_positions = np.minimum(dst_positions, samples.size - 1)
     resampled = np.interp(dst_positions, src_positions, samples).astype(np.int16)
     return resampled.tobytes()
 
@@ -60,8 +61,11 @@ class AudioStreamManager:
         self._output_idle_callback: Callable[[], None] | None = None
 
         self._input_thread: threading.Thread | None = None
-        self._output_thread: threading.Thread | None = None
-        self._output_queue: queue.Queue[tuple[int, bytes, int]] = queue.Queue()
+        self._output_buffer = bytearray()
+        self._output_prebuffer_bytes = self.output_chunk_bytes * 2
+        self._output_buffer_lock = threading.Lock()
+        self._output_primed = False
+        self._last_output_data_time = 0.0
         self._playback_generation = 0
         self._playback_lock = threading.Lock()
         self._output_active = False
@@ -92,12 +96,11 @@ class AudioStreamManager:
             output=True,
             output_device_index=self.output_device_index,
             frames_per_buffer=self.output_frames,
+            stream_callback=self._output_callback,
         )
 
         self._input_thread = threading.Thread(target=self._input_loop, daemon=True)
-        self._output_thread = threading.Thread(target=self._output_loop, daemon=True)
         self._input_thread.start()
-        self._output_thread.start()
 
     def stop(self) -> None:
         if not self._running.is_set():
@@ -108,8 +111,6 @@ class AudioStreamManager:
 
         if self._input_thread and self._input_thread.is_alive():
             self._input_thread.join(timeout=2)
-        if self._output_thread and self._output_thread.is_alive():
-            self._output_thread.join(timeout=2)
 
         if self._input_stream is not None:
             self._input_stream.stop_stream()
@@ -128,17 +129,25 @@ class AudioStreamManager:
             return
         with self._playback_lock:
             generation = self._playback_generation
-        self._output_queue.put((generation, audio_bytes, sample_rate))
+
+        if sample_rate != self.output_device_rate:
+            audio_bytes = resample_pcm16(audio_bytes, sample_rate, self.output_device_rate)
+
+        with self._output_buffer_lock:
+            with self._playback_lock:
+                if generation != self._playback_generation:
+                    return
+            self._output_buffer.extend(audio_bytes)
+            self._last_output_data_time = time.monotonic()
+            self._output_active = True
 
     def clear_output(self) -> None:
         with self._playback_lock:
             self._playback_generation += 1
 
-        try:
-            while True:
-                self._output_queue.get_nowait()
-        except queue.Empty:
-            pass
+        with self._output_buffer_lock:
+            self._output_buffer.clear()
+            self._output_primed = False
 
         if self._output_active:
             self._output_active = False
@@ -163,34 +172,48 @@ class AudioStreamManager:
             except OSError:
                 LOGGER.exception("读取麦克风失败")
 
-    def _output_loop(self) -> None:
-        while self._running.is_set():
-            try:
-                generation, data, sample_rate = self._output_queue.get(timeout=0.1)
-            except queue.Empty:
+    def _output_callback(
+        self,
+        in_data: bytes | None,
+        frame_count: int,
+        time_info: dict,
+        status_flags: int,
+    ) -> tuple[bytes, int]:
+        requested_bytes = frame_count * 2
+        silence = b"\x00" * requested_bytes
+
+        if not self._running.is_set():
+            return silence, pyaudio.paComplete
+
+        notify_idle = False
+        with self._output_buffer_lock:
+            buffered = len(self._output_buffer)
+            if not self._output_primed:
+                if buffered < self._output_prebuffer_bytes:
+                    return silence, pyaudio.paContinue
+                self._output_primed = True
+
+            if buffered >= requested_bytes:
+                data = bytes(self._output_buffer[:requested_bytes])
+                del self._output_buffer[:requested_bytes]
+                return data, pyaudio.paContinue
+
+            if buffered:
+                data = bytes(self._output_buffer) + (b"\x00" * (requested_bytes - buffered))
+                self._output_buffer.clear()
+                self._output_primed = False
+            else:
+                data = silence
+
+            if time.monotonic() - self._last_output_data_time > 0.2:
+                self._output_primed = False
                 if self._output_active:
                     self._output_active = False
-                    self._notify_output_idle()
-                continue
+                    notify_idle = True
 
-            self._output_active = True
-            if sample_rate != self.output_device_rate:
-                data = resample_pcm16(data, sample_rate, self.output_device_rate)
-
-            for index in range(0, len(data), self.output_chunk_bytes):
-                with self._playback_lock:
-                    current_generation = self._playback_generation
-
-                if generation != current_generation or not self._running.is_set():
-                    break
-
-                chunk = data[index : index + self.output_chunk_bytes]
-                try:
-                    assert self._output_stream is not None
-                    self._output_stream.write(chunk)
-                except OSError:
-                    LOGGER.exception("播放扬声器音频失败")
-                    break
+        if notify_idle:
+            self._notify_output_idle()
+        return data, pyaudio.paContinue
 
     def _notify_output_idle(self) -> None:
         if self._output_idle_callback is None:
