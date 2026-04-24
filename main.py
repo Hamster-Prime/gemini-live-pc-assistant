@@ -575,6 +575,16 @@ class AssistantApp:
         # 开机自启动配置变化时更新设置
         if old_config.auto_start != new_config.auto_start:
             self._set_auto_start(new_config.auto_start)
+        
+        # 代理配置变化时重启Gemini会话，应用新代理
+        if old_config.http_proxy != new_config.http_proxy or old_config.https_proxy != new_config.https_proxy:
+            LOGGER.info("代理配置已变化，重启Gemini会话应用新代理")
+            if self._gemini_session:
+                self._gemini_session.restart()
+            if self._floating_status:
+                self._floating_status.set_status_text("代理配置已更新，正在重启会话...")
+            if self._main_window:
+                self._main_window.set_status_text("代理配置已更新，正在重启会话...")
 
         # 重建唤醒检测器
         self._wake_detector = EnergyVadWakeDetector(

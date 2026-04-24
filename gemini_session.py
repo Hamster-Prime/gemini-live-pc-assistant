@@ -124,7 +124,13 @@ class GeminiLiveSession:
 
     async def _connect_once(self, config: AppConfig, api_key: str) -> None:
         self._notify_status("正在连接 Gemini Live API...")
-        client = genai.Client(api_key=api_key)
+        # 应用代理设置
+        proxies = {}
+        if config.http_proxy.strip():
+            proxies["http"] = config.http_proxy.strip()
+        if config.https_proxy.strip():
+            proxies["https"] = config.https_proxy.strip()
+        client = genai.Client(api_key=api_key, proxies=proxies if proxies else None)
         tool_registry = self._tool_registry_getter()
         live_config = self._build_live_config(config, tool_registry)
         if self._session_handle:

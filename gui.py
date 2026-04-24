@@ -441,6 +441,8 @@ class SettingsWindow:
             ("output_device_index", "输出设备索引 (-1=默认)", False),
             ("reconnect_initial_delay", "重连初始延迟 (秒)", False),
             ("reconnect_max_delay", "重连最大延迟 (秒)", False),
+            ("http_proxy", "HTTP代理地址 (如 http://127.0.0.1:7890)", False),
+            ("https_proxy", "HTTPS代理地址 (如 http://127.0.0.1:7890)", False),
             ("screenshot_dir", "截图保存目录", False),
             ("max_screenshots", "最大截图保留数量", False),
             ("status_window_opacity", "悬浮窗透明度 (0.1-1.0)", False),

@@ -47,6 +47,8 @@ class AppConfig:
     main_window_y: int = -1  # 主窗口Y坐标，-1表示默认
     main_window_width: int = 720  # 主窗口宽度
     main_window_height: int = 520  # 主窗口高度
+    http_proxy: str = ""  # HTTP代理地址，如 http://127.0.0.1:7890
+    https_proxy: str = ""  # HTTPS代理地址，如 http://127.0.0.1:7890
 
     def resolved_api_key(self) -> str:
         return self.api_key.strip() or os.getenv("GEMINI_API_KEY", "").strip()
