@@ -213,9 +213,30 @@ class MainWindow:
     def _run(self) -> None:
         self._root = tk.Tk()
         self._root.title("Gemini Live PC Assistant")
-        self._root.geometry("720x520")
+        
+        # 应用保存的窗口大小和位置
+        config = self._config_getter()
+        width = config.main_window_width
+        height = config.main_window_height
+        x = config.main_window_x
+        y = config.main_window_y
+        
+        if x >= 0 and y >= 0:
+            # 有保存的位置，使用保存的大小和位置
+            self._root.geometry(f"{width}x{height}+{x}+{y}")
+        else:
+            # 没有保存的位置，使用默认大小居中
+            self._root.geometry(f"{width}x{height}")
+            # 居中显示
+            self._root.update_idletasks()
+            screen_width = self._root.winfo_screenwidth()
+            screen_height = self._root.winfo_screenheight()
+            x = (screen_width - width) // 2
+            y = (screen_height - height) // 2
+            self._root.geometry(f"+{x}+{y}")
+        
         self._root.minsize(620, 420)
-        self._root.protocol("WM_DELETE_WINDOW", self._hide_to_tray)
+        self._root.protocol("WM_DELETE_WINDOW", self._on_window_close)
         self._status_var = tk.StringVar(self._root, value="正在启动 ...")
 
         style = ttk.Style(self._root)
@@ -292,6 +313,32 @@ class MainWindow:
 
 
 
+    def _on_window_close(self) -> None:
+        """窗口关闭时保存位置和大小，然后隐藏到托盘"""
+        if self._root is not None:
+            try:
+                # 获取当前窗口的位置和大小
+                geometry = self._root.geometry()
+                # geometry格式是 '宽度x高度+X+Y'
+                size_part, pos_part = geometry.split('+', 1)
+                width, height = map(int, size_part.split('x'))
+                x, y = map(int, pos_part.split('+'))
+                
+                # 保存到配置
+                from config import ConfigManager
+                config_manager = ConfigManager()
+                config_manager.update(
+                    main_window_width=width,
+                    main_window_height=height,
+                    main_window_x=x,
+                    main_window_y=y
+                )
+            except Exception as exc:
+                LOGGER.debug(f"保存窗口位置失败: {exc}")
+        
+        # 执行原来的隐藏到托盘逻辑
+        self._hide_to_tray()
+    
     def _hide_to_tray(self) -> None:
         if self._root is not None:
             self._root.withdraw()

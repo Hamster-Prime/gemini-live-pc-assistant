@@ -43,6 +43,10 @@ class AppConfig:
     status_window_opacity: float = 0.85
     silent_mode: bool = False
     auto_start: bool = False
+    main_window_x: int = -1  # 主窗口X坐标，-1表示默认
+    main_window_y: int = -1  # 主窗口Y坐标，-1表示默认
+    main_window_width: int = 720  # 主窗口宽度
+    main_window_height: int = 520  # 主窗口高度
 
     def resolved_api_key(self) -> str:
         return self.api_key.strip() or os.getenv("GEMINI_API_KEY", "").strip()
