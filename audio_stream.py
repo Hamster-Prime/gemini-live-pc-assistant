@@ -111,6 +111,7 @@ class AudioStreamManager:
                 self._input_stream.stop_stream()
                 self._input_stream.close()
                 self._input_stream = None
+            self._audio.terminate()
             self._running.clear()
             raise
 
