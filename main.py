@@ -119,6 +119,7 @@ class AssistantApp:
         self._manual_timer: threading.Timer | None = None
         self._muted = False
         self._lock = threading.Lock()
+        self._hold_to_talk = False
 
     # ------------------------------------------------------------------
     # 生命周期
@@ -209,8 +210,22 @@ class AssistantApp:
     def _register_hotkey(self) -> None:
         hotkey = self._config.hotkey
         try:
-            keyboard.add_hotkey(hotkey, self._on_hotkey_pressed, suppress=False)
-            LOGGER.info("已注册热键：%s", hotkey)
+            # 注册热键按下和松开事件，支持按住说话
+            def on_hotkey_press(e):
+                with self._lock:
+                    if not self._manual_mode:
+                        self._hold_to_talk = True
+                        self._on_hotkey_pressed() # 开始聆听
+            
+            def on_hotkey_release(e):
+                with self._lock:
+                    if self._hold_to_talk and self._manual_mode:
+                        self._hold_to_talk = False
+                        self._finish_manual_listen() # 松开结束
+            
+            keyboard.add_hotkey(hotkey, callback=on_hotkey_press, suppress=False, trigger_on_release=False)
+            keyboard.on_release_key(hotkey.split('+')[-1], callback=on_hotkey_release, suppress=False)
+            LOGGER.info("已注册热键：%s (支持按住说话)", hotkey)
         except Exception:
             LOGGER.exception("注册热键 %s 失败", hotkey)
 
