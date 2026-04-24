@@ -321,9 +321,12 @@ class PCController:
 
     def open_url(self, url: str) -> dict[str, Any]:
         """在默认浏览器中打开 URL。"""
-        import webbrowser
-        webbrowser.open(url)
-        return {"ok": True, "action": "open_url", "url": url}
+        try:
+            import webbrowser
+            webbrowser.open(url)
+            return {"ok": True, "action": "open_url", "url": url}
+        except Exception as exc:
+            return {"ok": False, "error": str(exc)}
 
     def kill_process(self, name: str) -> dict[str, Any]:
         """按进程名结束进程（比 close_app 更精确）。"""
@@ -441,11 +444,14 @@ class PCController:
 
     def search_web(self, query: str) -> dict[str, Any]:
         """在默认浏览器中搜索。"""
-        import webbrowser
-        import urllib.parse
-        url = f"https://www.google.com/search?q={urllib.parse.quote(query)}"
-        webbrowser.open(url)
-        return {"ok": True, "action": "search_web", "query": query, "url": url}
+        try:
+            import webbrowser
+            import urllib.parse
+            url = f"https://www.google.com/search?q={urllib.parse.quote(query)}"
+            webbrowser.open(url)
+            return {"ok": True, "action": "search_web", "query": query, "url": url}
+        except Exception as exc:
+            return {"ok": False, "error": str(exc)}
 
     def select_all(self) -> dict[str, Any]:
         """全选 (Ctrl+A)。"""
