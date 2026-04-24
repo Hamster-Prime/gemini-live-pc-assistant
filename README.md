@@ -7,20 +7,22 @@
 - **实时语音对话**：通过 Gemini Live API 实现低延迟双向语音交互
 - **唤醒词检测**：基于能量 VAD（语音活动检测），无需额外唤醒词模型
 - **热键控制**：默认 `Ctrl+Space` 切换手动监听模式
-- **PC 操控工具**（10 个）：
-  - `mouse_click` - 鼠标点击
-  - `mouse_move` - 鼠标移动
-  - `mouse_scroll` - 鼠标滚轮
-  - `type_text` - 键盘输入文本
-  - `press_key` - 按下单个按键
-  - `hotkey` - 组合键（如 Ctrl+C）
-  - `open_app` - 打开应用
-  - `close_app` - 关闭应用
-  - `screenshot` - 截屏
-  - `get_screen_info` - 获取屏幕信息
+- **PC 操控工具**（49 个）：
+  - 鼠标：click、double_click、right_click、move、scroll、drag、wait_and_click
+  - 键盘：type_text（支持中文）、press_key、hotkey、type_keys
+  - 便捷：select_all、undo、redo、copy、paste、save_file、close_tab、new_tab
+  - 应用：open_app、close_app
+  - 窗口：minimize、maximize、restore、focus_window、list_windows、switch_window、lock_screen
+  - 信息：screenshot、get_screen_info、get_mouse_position、get_pixel_color、get_clipboard、set_clipboard
+  - 系统：get_volume、set_volume、get_system_info、get_time、list_processes、kill_process
+  - 文件：read_file、write_file、list_directory
+  - 网络：open_url、search_web
+  - 命令：run_command（内置危险命令过滤）
+  - 音频：list_audio_devices
 - **系统托盘**：pystray 托盘图标，包含设置和退出菜单
 - **悬浮状态窗**：半透明悬浮窗显示当前状态、用户和助手文本（可拖拽）
-- **自动重连**：API 断开后指数退避自动重连
+- **静音控制**：`Ctrl+M` 快速切换麦克风静音
+- **Session Resumption**：支持 Gemini Live API 会话恢复，断线重连时保持上下文
 - **FAILSAFE**：pyautogui FAILSAFE 已启用，鼠标移到左上角可中断
 
 ## 系统要求
@@ -132,7 +134,7 @@ gemini-live-pc-assistant/
 ├── config.py            # 配置管理（dataclass + JSON 持久化）
 ├── audio_stream.py      # PyAudio 音频流管理（输入/输出/重采样）
 ├── gemini_session.py    # Gemini Live API 会话管理
-├── tools.py             # 工具注册与分发（10 个 PC 控制工具）
+├── tools.py             # 工具注册与分发（49 个 PC 控制工具）
 ├── pc_control.py        # PC 控制实现（pyautogui）
 ├── wake_word.py         # 基于能量的 VAD 唤醒检测
 ├── tray.py              # pystray 系统托盘
