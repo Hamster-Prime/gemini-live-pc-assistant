@@ -334,21 +334,29 @@ class SettingsWindow:
             ("screenshot_dir", "截图保存目录", False),
             ("max_screenshots", "最大截图保留数量", False),
             ("status_window_opacity", "悬浮窗透明度 (0.1-1.0)", False),
-            ("silent_mode", "静默模式（输入 True 开启/False 关闭）", False),
+            ("silent_mode", "静默模式（仅文字回复）", False),
         ]
 
+        self._checkboxes = {}  # 存储复选框变量
         for key, label, is_password in fields:
             row = ttk.Frame(scroll_frame)
             row.pack(fill=tk.X, padx=4, pady=3)
 
             ttk.Label(row, text=label, width=28, anchor=tk.W).pack(side=tk.LEFT)
 
-            entry = tk.Entry(row, width=30, show="*" if is_password else "")
-            entry.pack(side=tk.RIGHT, fill=tk.X, expand=True)
-
-            value = getattr(self._config, key, "")
-            entry.insert(0, str(value))
-            self._entries[key] = entry
+            if key == "silent_mode":
+                # 静默模式用复选框
+                var = tk.BooleanVar(value=getattr(self._config, key, False))
+                checkbox = ttk.Checkbutton(row, variable=var)
+                checkbox.pack(side=tk.RIGHT)
+                self._checkboxes[key] = var
+            else:
+                # 其他字段用输入框
+                entry = tk.Entry(row, width=30, show="*" if is_password else "")
+                entry.pack(side=tk.RIGHT, fill=tk.X, expand=True)
+                value = getattr(self._config, key, "")
+                entry.insert(0, str(value))
+                self._entries[key] = entry
 
         # 按钮区
         btn_frame = ttk.Frame(self._root, padding=8)
@@ -369,18 +377,17 @@ class SettingsWindow:
     def _on_save_click(self) -> None:
         try:
             updates: dict = {}
+            # 读取输入框的值
             for key, entry in self._entries.items():
                 updates[key] = entry.get()
+            # 读取复选框的值
+            for key, var in self._checkboxes.items():
+                updates[key] = var.get()
 
             # Validate numeric fields before saving
             default = AppConfig()
             for key, value in updates.items():
                 field_default = getattr(default, key, None)
-                # 处理布尔类型
-                if isinstance(field_default, bool):
-                    lower_val = value.strip().lower()
-                    updates[key] = lower_val in ("true", "1", "yes", "on")
-                    continue
                 # 处理数字类型
                 if isinstance(field_default, (int, float)) and not isinstance(field_default, bool):
                     try:
@@ -428,9 +435,13 @@ class SettingsWindow:
 
     def _on_reset(self) -> None:
         default = AppConfig()
+        # 重置输入框
         for key, entry in self._entries.items():
             entry.delete(0, tk.END)
             entry.insert(0, str(getattr(default, key, "")))
+        # 重置复选框
+        for key, var in self._checkboxes.items():
+            var.set(getattr(default, key, False))
 
     def _on_close(self) -> None:
         self._alive = False
