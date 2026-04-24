@@ -350,8 +350,8 @@ class AssistantApp:
 
         if self._gemini_session and not self._gemini_session.is_connected():
             self._gemini_session.restart()
-
-        if self._gemini_session:
+            # activity_start will be sent after reconnection
+        elif self._gemini_session and self._gemini_session.is_connected():
             self._gemini_session.send_activity_start()
 
         if self._floating_status:
