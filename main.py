@@ -678,8 +678,12 @@ class AssistantApp:
                 pass
             self._register_hold_hotkey(new_config.hotkey)
 
-        # 重启 Gemini 会话以应用新配置
-        if self._gemini_session:
+        # 仅在模型或API Key变更时重启Gemini会话（代理变更已在上面处理）
+        gemini_changed = (
+            old_config.model != new_config.model
+            or old_config.resolved_api_key() != new_config.resolved_api_key()
+        )
+        if gemini_changed and self._gemini_session:
             self._gemini_session.restart()
 
         if self._floating_status:
