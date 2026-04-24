@@ -604,6 +604,3 @@ class FloatingStatusWindow:
                     self.hide()
             except Exception:
                 pass
-    
-    def hide(self) -> None:
-        
