@@ -59,7 +59,7 @@ class MainWindow:
         self._mute_button: ttk.Button | None = None
         self._export_button: ttk.Button | None = None
         self._alive = False
-        self._conversation_history = []  # 存储对话历史，每条包含role, content, timestamp
+        self._conversation_history = []
 
     def start(self) -> None:
         if self._alive:
@@ -91,7 +91,6 @@ class MainWindow:
         timestamp = datetime.now().strftime("%H:%M:%S")
         full_text = f"[{timestamp}] {text}"
         self._append_text(self._user_text, full_text)
-        # 保存到对话历史
         self._conversation_history.append({
             "role": "user",
             "content": text,
@@ -103,253 +102,11 @@ class MainWindow:
         timestamp = datetime.now().strftime("%H:%M:%S")
         full_text = f"[{timestamp}] {text}"
         self._append_text(self._assistant_text, full_text)
-        # 保存到对话历史
         self._conversation_history.append({
             "role": "assistant",
             "content": text,
             "timestamp": timestamp
         })
-    
-    def _clear_conversations(self) -> None:
-        """清空对话历史"""
-        if self._root is None:
-            return
-        
-        def clear():
-            try:
-                # 清空用户和助手对话
-                if self._user_text:
-                    self._user_text.config(state=tk.NORMAL)
-                    self._user_text.delete(1.0, tk.END)
-                    self._user_text.config(state=tk.DISABLED)
-                if self._assistant_text:
-                    self._assistant_text.config(state=tk.NORMAL)
-                    self._assistant_text.delete(1.0, tk.END)
-                    self._assistant_text.config(state=tk.DISABLED)
-            except tk.TclError:
-                pass
-        
-        self._root.after(0, clear)
-    
-    def update_status_bar(self, config: AppConfig) -> None:
-        """更新状态栏显示"""
-        if self._root is None or self._status_var is None:
-            return
-        status_parts = [f"热键: {config.hotkey}", f"模型: {config.model}"]
-        if config.silent_mode:
-            status_parts.append("【静默模式】")
-        status_text = "    ".join(status_parts)
-        self._root.after(0, lambda: self._status_var.set(status_text))
-    
-    def _export_conversation(self) -> None:
-        """导出对话历史为Markdown文件"""
-        if not self._conversation_history:
-            if self._root:
-                tk.messagebox.showinfo("提示", "没有对话历史可以导出")
-            return
-        
-        try:
-            from datetime import datetime
-            from tkinter import filedialog
-            
-            # 生成默认文件名
-            default_name = f"对话历史_{datetime.now().strftime('%Y%m%d_%H%M%S')}.md"
-            
-            # 弹出保存对话框
-            file_path = filedialog.asksaveasfilename(
-                defaultextension=".md",
-                filetypes=[("Markdown 文件", "*.md"), ("文本文件", "*.txt"), ("所有文件", "*.*")],
-                initialfile=default_name,
-                title="导出对话历史"
-            )
-            
-            if not file_path:
-                return  # 用户取消
-            
-            # 生成Markdown内容
-            content = f"# Gemini 对话历史\n\n导出时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n---\n\n"
-            for msg in self._conversation_history:
-                role = "🙋 用户" if msg["role"] == "user" else "🤖 助手"
-                content += f"## {role} ({msg['timestamp']})\n\n{msg['content']}\n\n---\n\n"
-            
-            # 保存文件
-            with open(file_path, "w", encoding="utf-8") as f:
-                f.write(content)
-            
-            # 提示成功
-            if self._root:
-                tk.messagebox.showinfo("导出成功", f"对话历史已保存到:\n{file_path}")
-                
-        except Exception as exc:
-            LOGGER.exception("导出对话历史失败")
-            if self._root:
-                tk.messagebox.showerror("导出失败", f"导出对话历史失败: {str(exc)}")
-    
-    def _open_help_window(self) -> None:
-        """打开帮助窗口"""
-        if not hasattr(self, '_help_window') or not self._help_window.is_alive():
-            self._help_window = HelpWindow()
-            self._help_window.start()
-
-
-# ======================================================================
-# 帮助窗口
-# ======================================================================
-
-
-class HelpWindow:
-    """帮助窗口，显示快捷键和使用说明"""
-    
-    def __init__(self) -> None:
-        self._root: tk.Tk | None = None
-        self._thread: threading.Thread | None = None
-        self._alive = False
-    
-    def start(self) -> None:
-        if self._alive:
-            return
-        self._alive = True
-        self._thread = threading.Thread(target=self._run, daemon=True)
-        self._thread.start()
-    
-    def stop(self) -> None:
-        self._alive = False
-        if self._root:
-            try:
-                self._root.after(0, self._root.destroy)
-            except Exception:
-                pass
-    
-    def is_alive(self) -> bool:
-        return self._alive
-    
-    def _run(self) -> None:
-        self._root = tk.Tk()
-        self._root.title("Gemini Live PC Assistant - 帮助")
-        self._root.geometry("600x500")
-        self._root.resizable(False, False)
-        self._root.protocol("WM_DELETE_WINDOW", self._on_close)
-        
-        # 主框架
-        main_frame = ttk.Frame(self._root, padding=12)
-        main_frame.pack(fill=tk.BOTH, expand=True)
-        
-        # 标题
-        ttk.Label(main_frame, text="使用帮助", font=("", 14, "bold")).pack(pady=(0, 8))
-        
-        # 笔记本控件，分页显示不同内容
-        notebook = ttk.Notebook(main_frame)
-        notebook.pack(fill=tk.BOTH, expand=True, pady=8)
-        
-        # 快捷键页面
-        hotkey_frame = ttk.Frame(notebook, padding=8)
-        notebook.add(hotkey_frame, text="快捷键说明")
-        
-        hotkey_content = """
-⌨️  快捷键说明
-
-{hotkey}  按住说话/松开结束；短按切换手动聆听模式
-Ctrl + M  切换麦克风静音
-Ctrl + O  快速打开主窗口
-Ctrl + C  复制选中的对话文本
-Ctrl + A  全选当前面板的对话文本
-鼠标移到屏幕左上角  紧急中断助手自动化操作（PyAutoGUI安全机制）
-        """.format(hotkey=self._get_default_hotkey())
-        
-        hotkey_label = ttk.Label(hotkey_frame, text=hotkey_content, justify=tk.LEFT, wraplength=550)
-        hotkey_label.pack(anchor=tk.W)
-        
-        # 功能说明页面
-        feature_frame = ttk.Frame(notebook, padding=8)
-        notebook.add(feature_frame, text="功能介绍")
-        
-        feature_content = """
-✨  主要功能
-
-🎙️  语音对话
-- 支持实时语音输入，自动语音识别
-- 助手语音回复，支持静默模式（仅显示文字）
-- 按住说话功能：按住热键说话，松开自动结束
-
-🖥️  远程控制
-- 支持截图、打开应用、模拟键鼠操作等40+系统控制工具
-- 截图自动保存到本地，同时复制到剪贴板
-
-💬  对话管理
-- 对话历史永久保存，支持导出为Markdown文件
-- 对话文本支持选择复制，右键菜单操作
-
-⚙️  个性化设置
-- 自定义热键、语音参数、代理配置
-- 悬浮窗透明度自定义，窗口位置记忆
-- 开机自启动、静默模式等实用功能
-
-🔔  智能提示
-- 主窗口隐藏时新消息自动弹出系统通知
-- 连接状态、操作结果实时显示
-        """
-        
-        feature_label = ttk.Label(feature_frame, text=feature_content, justify=tk.LEFT, wraplength=550)
-        feature_label.pack(anchor=tk.W)
-        
-        # 使用技巧页面
-        tip_frame = ttk.Frame(notebook, padding=8)
-        notebook.add(tip_frame, text="使用技巧")
-        
-        tip_content = """
-💡  使用技巧
-
-1.  对于长文本或中文输入，使用按住说话功能比手动聆听更方便，说完松开就会自动处理
-2.  你可以直接要求助手「帮我打开计算器」、「截图保存」、「帮我写一份Python脚本」等，无需手动操作
-3.  悬浮窗双击可以快速打开主窗口，右键托盘图标有更多快捷操作
-4.  如果网络不好，可以在设置里配置代理，修改后会自动重启会话
-5.  重要的对话可以通过「导出对话」功能保存为Markdown文件永久留存
-6.  如果助手执行了误操作，立刻把鼠标移到屏幕左上角可以中断所有自动化操作
-7.  静默模式下助手不会播放语音，只会显示文字回复，适合公共场合使用
-        """
-        
-        tip_label = ttk.Label(tip_frame, text=tip_content, justify=tk.LEFT, wraplength=550)
-        tip_label.pack(anchor=tk.W)
-        
-        # 关于页面
-        about_frame = ttk.Frame(notebook, padding=8)
-        notebook.add(about_frame, text="关于")
-        
-        about_content = """
-ℹ️  关于本程序
-
-Gemini Live PC Assistant 是一款基于Google Gemini Live API的智能桌面助手
-支持实时语音交互、桌面控制、信息查询等功能，让你的电脑操作更高效
-
-GitHub 仓库：https://github.com/Hamster-Prime/gemini-live-pc-assistant
-
-本程序完全开源免费，欢迎Star、Fork、提交PR贡献代码
-        """
-        
-        about_label = ttk.Label(about_frame, text=about_content, justify=tk.LEFT, wraplength=550)
-        about_label.pack(anchor=tk.W)
-        
-        # 底部按钮
-        btn_frame = ttk.Frame(main_frame)
-        btn_frame.pack(fill=tk.X, pady=(8, 0))
-        ttk.Button(btn_frame, text="关闭", command=self._on_close).pack(side=tk.RIGHT)
-        
-        self._root.mainloop()
-    
-    @staticmethod
-    def _get_default_hotkey() -> str:
-        """获取默认热键提示"""
-        try:
-            from config import ConfigManager
-            config = ConfigManager().load()
-            return config.hotkey
-        except Exception:
-            return "Ctrl + Space"
-    
-    def _on_close(self) -> None:
-        self._alive = False
-        if self._root:
-            self._root.destroy()
 
     def set_listening(self, listening: bool) -> None:
         if self._root is None or self._toggle_button is None:
@@ -363,44 +120,89 @@ GitHub 仓库：https://github.com/Hamster-Prime/gemini-live-pc-assistant
         label = "取消静音" if muted else "静音"
         self._root.after(0, lambda: self._mute_button.configure(text=label))
 
+    def update_status_bar(self, config: AppConfig) -> None:
+        if self._root is None or self._status_var is None:
+            return
+        status_parts = [f"热键: {config.hotkey}", f"模型: {config.model}"]
+        if config.silent_mode:
+            status_parts.append("【静默模式】")
+        status_text = "    ".join(status_parts)
+        self._root.after(0, lambda: self._status_var.set(status_text))
+
+    def _export_conversation(self) -> None:
+        if not self._conversation_history:
+            if self._root:
+                tk.messagebox.showinfo("提示", "没有对话历史可以导出")
+            return
+        try:
+            from datetime import datetime
+            from tkinter import filedialog
+            default_name = f"对话历史_{datetime.now().strftime('%Y%m%d_%H%M%S')}.md"
+            file_path = filedialog.asksaveasfilename(
+                defaultextension=".md",
+                filetypes=[("Markdown 文件", "*.md"), ("文本文件", "*.txt"), ("所有文件", "*.*")],
+                initialfile=default_name,
+                title="导出对话历史"
+            )
+            if not file_path:
+                return
+            content = f"# Gemini 对话历史\n\n导出时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n---\n\n"
+            for msg in self._conversation_history:
+                role = "用户" if msg["role"] == "user" else "助手"
+                content += f"## {role} ({msg['timestamp']})\n\n{msg['content']}\n\n---\n\n"
+            with open(file_path, "w", encoding="utf-8") as f:
+                f.write(content)
+            if self._root:
+                tk.messagebox.showinfo("导出成功", f"对话历史已保存到:\n{file_path}")
+        except Exception as exc:
+            LOGGER.exception("导出对话历史失败")
+            if self._root:
+                tk.messagebox.showerror("导出失败", f"导出对话历史失败: {str(exc)}")
+
+    def _open_help_window(self) -> None:
+        if not hasattr(self, '_help_window') or not self._help_window.is_alive():
+            self._help_window = HelpWindow()
+            self._help_window.start()
+
     def _clear_conversations(self) -> None:
-        """清空对话历史显示和内存记录。"""
-        for widget in (self._user_text, self._assistant_text):
-            if widget is not None:
-                try:
-                    widget.configure(state=tk.NORMAL)
-                    widget.delete("1.0", tk.END)
-                    widget.configure(state=tk.DISABLED)
-                except tk.TclError:
-                    pass
-        # 清空内存中的历史记录
+        if self._root is None:
+            return
+        def clear():
+            try:
+                if self._user_text:
+                    self._user_text.config(state=tk.NORMAL)
+                    self._user_text.delete(1.0, tk.END)
+                    self._user_text.config(state=tk.DISABLED)
+                if self._assistant_text:
+                    self._assistant_text.config(state=tk.NORMAL)
+                    self._assistant_text.delete(1.0, tk.END)
+                    self._assistant_text.config(state=tk.DISABLED)
+            except tk.TclError:
+                pass
+        self._root.after(0, clear)
         self._conversation_history.clear()
 
     def _run(self) -> None:
         self._root = tk.Tk()
         self._root.title("Gemini Live PC Assistant")
-        
-        # 应用保存的窗口大小和位置
+
         config = self._config_getter()
         width = config.main_window_width
         height = config.main_window_height
         x = config.main_window_x
         y = config.main_window_y
-        
+
         if x >= 0 and y >= 0:
-            # 有保存的位置，使用保存的大小和位置
             self._root.geometry(f"{width}x{height}+{x}+{y}")
         else:
-            # 没有保存的位置，使用默认大小居中
             self._root.geometry(f"{width}x{height}")
-            # 居中显示
             self._root.update_idletasks()
             screen_width = self._root.winfo_screenwidth()
             screen_height = self._root.winfo_screenheight()
             x = (screen_width - width) // 2
             y = (screen_height - height) // 2
             self._root.geometry(f"+{x}+{y}")
-        
+
         self._root.minsize(620, 420)
         self._root.protocol("WM_DELETE_WINDOW", self._on_window_close)
         self._status_var = tk.StringVar(self._root, value="正在启动 ...")
@@ -447,32 +249,26 @@ GitHub 仓库：https://github.com/Hamster-Prime/gemini-live-pc-assistant
 
     def _create_text_panel(self, panes: ttk.PanedWindow, title: str) -> tk.Text:
         frame = ttk.LabelFrame(panes, text=title, padding=8)
-        # 创建文本控件，允许选择但禁止编辑
         text = tk.Text(frame, height=12, wrap=tk.WORD, state=tk.DISABLED, exportselection=True, takefocus=True)
         scrollbar = ttk.Scrollbar(frame, orient=tk.VERTICAL, command=text.yview)
         text.configure(yscrollcommand=scrollbar.set)
         text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-        
-        # 添加右键菜单
+
         def show_context_menu(event):
             try:
                 menu = tk.Menu(text, tearoff=0)
-                # 只有选中文本时才显示复制选项
                 if text.tag_ranges(tk.SEL):
                     menu.add_command(label="复制", command=lambda: text.event_generate("<<Copy>>"))
                 menu.add_command(label="全选", command=lambda: text.tag_add(tk.SEL, "1.0", tk.END))
                 menu.tk_popup(event.x_root, event.y_root)
             finally:
                 menu.grab_release()
-        
-        # 绑定右键菜单
+
         text.bind("<Button-3>", show_context_menu)
-        # 允许用键盘快捷键复制（Ctrl+C）
         text.bind("<Control-c>", lambda e: text.event_generate("<<Copy>>") if text.tag_ranges(tk.SEL) else None)
-        # 允许用键盘快捷键全选（Ctrl+A）
         text.bind("<Control-a>", lambda e: (text.tag_add(tk.SEL, "1.0", tk.END), "break"))
-        
+
         panes.add(frame, weight=1)
         return text
 
@@ -499,20 +295,13 @@ GitHub 仓库：https://github.com/Hamster-Prime/gemini-live-pc-assistant
             foreground=_STATE_COLORS.get(state, "#455A64"),
         )
 
-
-
     def _on_window_close(self) -> None:
-        """窗口关闭时保存位置和大小，然后隐藏到托盘"""
         if self._root is not None:
             try:
-                # 获取当前窗口的位置和大小
                 geometry = self._root.geometry()
-                # geometry格式是 '宽度x高度+X+Y'
                 size_part, pos_part = geometry.split('+', 1)
                 width, height = map(int, size_part.split('x'))
                 x, y = map(int, pos_part.split('+'))
-                
-                # 保存到配置
                 from config import ConfigManager
                 config_manager = ConfigManager()
                 config_manager.update(
@@ -523,10 +312,8 @@ GitHub 仓库：https://github.com/Hamster-Prime/gemini-live-pc-assistant
                 )
             except Exception as exc:
                 LOGGER.debug(f"保存窗口位置失败: {exc}")
-        
-        # 执行原来的隐藏到托盘逻辑
         self._hide_to_tray()
-    
+
     def _hide_to_tray(self) -> None:
         if self._root is not None:
             self._root.withdraw()
@@ -541,6 +328,147 @@ GitHub 仓库：https://github.com/Hamster-Prime/gemini-live-pc-assistant
         if self._root is not None:
             self._root.deiconify()
             self._root.lift()
+
+
+# ======================================================================
+# 帮助窗口
+# ======================================================================
+
+
+class HelpWindow:
+    """帮助窗口，显示快捷键和使用说明"""
+
+    def __init__(self) -> None:
+        self._root: tk.Tk | None = None
+        self._thread: threading.Thread | None = None
+        self._alive = False
+
+    def start(self) -> None:
+        if self._alive:
+            return
+        self._alive = True
+        self._thread = threading.Thread(target=self._run, daemon=True)
+        self._thread.start()
+
+    def stop(self) -> None:
+        self._alive = False
+        if self._root:
+            try:
+                self._root.after(0, self._root.destroy)
+            except Exception:
+                pass
+
+    def is_alive(self) -> bool:
+        return self._alive
+
+    def _run(self) -> None:
+        self._root = tk.Tk()
+        self._root.title("Gemini Live PC Assistant - 帮助")
+        self._root.geometry("600x500")
+        self._root.resizable(False, False)
+        self._root.protocol("WM_DELETE_WINDOW", self._on_close)
+
+        main_frame = ttk.Frame(self._root, padding=12)
+        main_frame.pack(fill=tk.BOTH, expand=True)
+
+        ttk.Label(main_frame, text="使用帮助", font=("", 14, "bold")).pack(pady=(0, 8))
+
+        notebook = ttk.Notebook(main_frame)
+        notebook.pack(fill=tk.BOTH, expand=True, pady=8)
+
+        # 快捷键页面
+        hotkey_frame = ttk.Frame(notebook, padding=8)
+        notebook.add(hotkey_frame, text="快捷键说明")
+        hotkey_content = """
+快捷键说明
+
+{hotkey}  按住说话/松开结束；短按切换手动聆听模式
+Ctrl + M  切换麦克风静音
+Ctrl + O  快速打开主窗口
+Ctrl + C  复制选中的对话文本
+Ctrl + A  全选当前面板的对话文本
+鼠标移到屏幕左上角  紧急中断助手自动化操作
+        """.format(hotkey=self._get_default_hotkey())
+        ttk.Label(hotkey_frame, text=hotkey_content, justify=tk.LEFT, wraplength=550).pack(anchor=tk.W)
+
+        # 功能说明页面
+        feature_frame = ttk.Frame(notebook, padding=8)
+        notebook.add(feature_frame, text="功能介绍")
+        feature_content = """
+主要功能
+
+语音对话
+- 支持实时语音输入，自动语音识别
+- 助手语音回复，支持静默模式（仅显示文字）
+- 按住说话功能：按住热键说话，松开自动结束
+
+远程控制
+- 支持截图、打开应用、模拟键鼠操作等40+系统控制工具
+- 截图自动保存到本地，同时复制到剪贴板
+
+对话管理
+- 对话历史永久保存，支持导出为Markdown文件
+- 对话文本支持选择复制，右键菜单操作
+
+个性化设置
+- 自定义热键、语音参数、代理配置
+- 悬浮窗透明度自定义，窗口位置记忆
+- 开机自启动、静默模式等实用功能
+
+智能提示
+- 主窗口隐藏时新消息自动弹出系统通知
+- 连接状态、操作结果实时显示
+        """
+        ttk.Label(feature_frame, text=feature_content, justify=tk.LEFT, wraplength=550).pack(anchor=tk.W)
+
+        # 使用技巧页面
+        tip_frame = ttk.Frame(notebook, padding=8)
+        notebook.add(tip_frame, text="使用技巧")
+        tip_content = """
+使用技巧
+
+1.  对于长文本或中文输入，使用按住说话功能比手动聆听更方便
+2.  你可以直接要求助手「帮我打开计算器」、「截图保存」等
+3.  悬浮窗双击可以快速打开主窗口
+4.  如果网络不好，可以在设置里配置代理
+5.  重要的对话可以通过「导出对话」功能保存为Markdown文件
+6.  如果助手执行了误操作，立刻把鼠标移到屏幕左上角可以中断
+7.  静默模式下助手不会播放语音，适合公共场合使用
+        """
+        ttk.Label(tip_frame, text=tip_content, justify=tk.LEFT, wraplength=550).pack(anchor=tk.W)
+
+        # 关于页面
+        about_frame = ttk.Frame(notebook, padding=8)
+        notebook.add(about_frame, text="关于")
+        about_content = """
+关于本程序
+
+Gemini Live PC Assistant 是一款基于Google Gemini Live API的智能桌面助手
+支持实时语音交互、桌面控制、信息查询等功能
+
+GitHub: https://github.com/Hamster-Prime/gemini-live-pc-assistant
+        """
+        ttk.Label(about_frame, text=about_content, justify=tk.LEFT, wraplength=550).pack(anchor=tk.W)
+
+        btn_frame = ttk.Frame(main_frame)
+        btn_frame.pack(fill=tk.X, pady=(8, 0))
+        ttk.Button(btn_frame, text="关闭", command=self._on_close).pack(side=tk.RIGHT)
+
+        self._root.mainloop()
+
+    @staticmethod
+    def _get_default_hotkey() -> str:
+        try:
+            from config import ConfigManager
+            config = ConfigManager().load()
+            return config.hotkey
+        except Exception:
+            return "Ctrl + Space"
+
+    def _on_close(self) -> None:
+        self._alive = False
+        if self._root:
+            self._root.destroy()
 
 
 # ======================================================================
@@ -582,14 +510,11 @@ class SettingsWindow:
         self._root.resizable(False, False)
         self._root.protocol("WM_DELETE_WINDOW", self._on_close)
 
-        # 主框架
         main_frame = ttk.Frame(self._root, padding=12)
         main_frame.pack(fill=tk.BOTH, expand=True)
 
-        # 标题
         ttk.Label(main_frame, text="设置", font=("", 14, "bold")).pack(pady=(0, 8))
 
-        # 可滚动区域
         canvas = tk.Canvas(main_frame, highlightthickness=0)
         scrollbar = ttk.Scrollbar(main_frame, orient=tk.VERTICAL, command=canvas.yview)
         scroll_frame = ttk.Frame(canvas)
@@ -603,12 +528,10 @@ class SettingsWindow:
         canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
 
-        # 鼠标滚轮支持
         def _on_mousewheel(event: tk.Event) -> None:
             canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
         canvas.bind_all("<MouseWheel>", _on_mousewheel)
 
-        # 字段定义
         fields = [
             ("api_key", "Gemini API Key", True),
             ("model", "模型名称", False),
@@ -638,7 +561,7 @@ class SettingsWindow:
             ("auto_start", "开机自动启动", False),
         ]
 
-        self._checkboxes = {}  # 存储复选框变量
+        self._checkboxes = {}
         for key, label, is_password in fields:
             row = ttk.Frame(scroll_frame)
             row.pack(fill=tk.X, padx=4, pady=3)
@@ -646,50 +569,37 @@ class SettingsWindow:
             ttk.Label(row, text=label, width=28, anchor=tk.W).pack(side=tk.LEFT)
 
             if key == "silent_mode":
-                # 静默模式用复选框
                 var = tk.BooleanVar(value=getattr(self._config, key, False))
                 checkbox = ttk.Checkbutton(row, variable=var)
                 checkbox.pack(side=tk.RIGHT)
                 self._checkboxes[key] = var
             else:
-                # 其他字段用输入框
                 entry = tk.Entry(row, width=30, show="*" if is_password else "")
                 entry.pack(side=tk.RIGHT, fill=tk.X, expand=True)
                 value = getattr(self._config, key, "")
                 entry.insert(0, str(value))
                 self._entries[key] = entry
 
-        # 按钮区
         btn_frame = ttk.Frame(self._root, padding=8)
         btn_frame.pack(fill=tk.X)
 
-        ttk.Button(btn_frame, text="保存", command=self._on_save_click).pack(
-            side=tk.RIGHT, padx=4
-        )
-        ttk.Button(btn_frame, text="取消", command=self._on_close).pack(
-            side=tk.RIGHT, padx=4
-        )
-        ttk.Button(btn_frame, text="重置为默认", command=self._on_reset).pack(
-            side=tk.LEFT, padx=4
-        )
+        ttk.Button(btn_frame, text="保存", command=self._on_save_click).pack(side=tk.RIGHT, padx=4)
+        ttk.Button(btn_frame, text="取消", command=self._on_close).pack(side=tk.RIGHT, padx=4)
+        ttk.Button(btn_frame, text="重置为默认", command=self._on_reset).pack(side=tk.LEFT, padx=4)
 
         self._root.mainloop()
 
     def _on_save_click(self) -> None:
         try:
             updates: dict = {}
-            # 读取输入框的值
             for key, entry in self._entries.items():
                 updates[key] = entry.get()
-            # 读取复选框的值
             for key, var in self._checkboxes.items():
                 updates[key] = var.get()
 
-            # Validate numeric fields before saving
             default = AppConfig()
             for key, value in updates.items():
                 field_default = getattr(default, key, None)
-                # 处理数字类型
                 if isinstance(field_default, (int, float)) and not isinstance(field_default, bool):
                     try:
                         if isinstance(field_default, int):
@@ -701,7 +611,6 @@ class SettingsWindow:
                             self._root.title(f"字段 {key} 必须是数字")
                         return
 
-                    # Range validation
                     range_limits = {
                         "vad_threshold": (0, 10000),
                         "vad_multiplier": (1.0, 10.0),
@@ -736,11 +645,9 @@ class SettingsWindow:
 
     def _on_reset(self) -> None:
         default = AppConfig()
-        # 重置输入框
         for key, entry in self._entries.items():
             entry.delete(0, tk.END)
             entry.insert(0, str(getattr(default, key, "")))
-        # 重置复选框
         for key, var in self._checkboxes.items():
             var.set(getattr(default, key, False))
 
@@ -817,7 +724,7 @@ class FloatingStatusWindow:
     def _run(self) -> None:
         self._root = tk.Tk()
         self._root.title("状态")
-        self._root.overrideredirect(True)  # 无边框
+        self._root.overrideredirect(True)
         self._root.attributes("-topmost", True)
         self._root.configure(bg="#1E1E1E")
 
@@ -827,46 +734,27 @@ class FloatingStatusWindow:
         self._root.geometry(f"260x100+{x}+{y}")
         self._root.attributes("-alpha", max(0.1, min(1.0, cfg.status_window_opacity)))
 
-        # 拖拽支持
         self._root.bind("<Button-1>", self._on_drag_start)
         self._root.bind("<B1-Motion>", self._on_drag_motion)
         self._root.bind("<ButtonRelease-1>", self._on_drag_end)
-        # 双击事件支持
         if self._on_double_click:
             self._root.bind("<Double-Button-1>", self._on_double_click_handler)
 
-        # 状态标签
         self._state_label = tk.Label(
-            self._root,
-            text="初始化中 ...",
-            font=("", 10, "bold"),
-            fg="#9E9E9E",
-            bg="#1E1E1E",
-            anchor=tk.W,
+            self._root, text="初始化中 ...", font=("", 10, "bold"),
+            fg="#9E9E9E", bg="#1E1E1E", anchor=tk.W,
         )
         self._state_label.pack(fill=tk.X, padx=8, pady=(6, 0))
 
-        # 用户文本
         self._user_label = tk.Label(
-            self._root,
-            text="",
-            font=("", 9),
-            fg="#BBBBBB",
-            bg="#1E1E1E",
-            anchor=tk.W,
-            wraplength=240,
+            self._root, text="", font=("", 9),
+            fg="#BBBBBB", bg="#1E1E1E", anchor=tk.W, wraplength=240,
         )
         self._user_label.pack(fill=tk.X, padx=8)
 
-        # 助手文本
         self._assistant_label = tk.Label(
-            self._root,
-            text="",
-            font=("", 9),
-            fg="#BBBBBB",
-            bg="#1E1E1E",
-            anchor=tk.W,
-            wraplength=240,
+            self._root, text="", font=("", 9),
+            fg="#BBBBBB", bg="#1E1E1E", anchor=tk.W, wraplength=240,
         )
         self._assistant_label.pack(fill=tk.X, padx=8)
 
@@ -886,7 +774,6 @@ class FloatingStatusWindow:
         self._root.geometry(f"+{x}+{y}")
 
     def _on_drag_end(self, event: tk.Event) -> None:
-        """拖拽结束时保存窗口位置。"""
         if self._root is None:
             return
         try:
@@ -898,9 +785,8 @@ class FloatingStatusWindow:
                 ConfigManager().update(status_window_x=x, status_window_y=y)
         except Exception:
             pass
-    
+
     def _on_double_click_handler(self, event: tk.Event) -> None:
-        """双击事件处理"""
         try:
             if self._on_double_click:
                 self._on_double_click()
@@ -921,21 +807,21 @@ class FloatingStatusWindow:
             label.config(text=text, fg=fg)
         except tk.TclError:
             pass
-    
+
     def hide(self) -> None:
         if self._root is not None:
             try:
                 self._root.after(0, lambda: self._root.withdraw())
             except Exception:
                 pass
-    
+
     def show(self) -> None:
         if self._root is not None:
             try:
                 self._root.after(0, lambda: self._root.deiconify())
             except Exception:
                 pass
-    
+
     def toggle_visibility(self) -> None:
         if self._root is not None:
             try:
@@ -945,9 +831,8 @@ class FloatingStatusWindow:
                     self.hide()
             except Exception:
                 pass
-    
+
     def update_opacity(self, opacity: float) -> None:
-        """实时更新悬浮窗透明度"""
         if self._root is None:
             return
         try:

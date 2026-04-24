@@ -615,7 +615,14 @@ class AssistantApp:
             if self._main_window:
                 self._main_window.set_status_text("代理配置已更新，正在重启会话...")
 
-        # 重建唤醒检测器
+        # 重建唤醒检测器，添加音量回调
+        def on_volume_update(volume: int) -> None:
+            """音量更新回调，把音量值传给界面显示"""
+            if self._floating_status:
+                self._floating_status.update_volume(volume)
+            if self._main_window:
+                self._main_window.update_volume(volume)
+        
         self._wake_detector = EnergyVadWakeDetector(
             threshold=new_config.vad_threshold,
             multiplier=new_config.vad_multiplier,
@@ -623,6 +630,7 @@ class AssistantApp:
             release_ms=new_config.vad_release_ms,
             pre_roll_ms=new_config.pre_roll_ms,
             chunk_ms=new_config.chunk_ms,
+            volume_callback=on_volume_update,
         )
 
         # 音频设备配置变更时重启音频流

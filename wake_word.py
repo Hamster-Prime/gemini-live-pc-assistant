@@ -28,12 +28,15 @@ class EnergyVadWakeDetector:
         release_ms: int,
         pre_roll_ms: int,
         chunk_ms: int,
+        volume_callback: callable = None,
     ) -> None:
         self.base_threshold = float(threshold)
         self.multiplier = float(multiplier)
         self.attack_frames = max(1, math.ceil(attack_ms / chunk_ms))
         self.release_frames = max(1, math.ceil(release_ms / chunk_ms))
         self.pre_roll_frames = max(1, math.ceil(pre_roll_ms / chunk_ms))
+        self.volume_callback = volume_callback  # 音量回调，参数是归一化的音量值0-100
+        self._max_energy = 1000  # 最大能量参考值，用于归一化音量
 
         self._noise_floor = max(1.0, self.base_threshold / 2)
         self._pre_roll: deque[bytes] = deque(maxlen=self.pre_roll_frames)
@@ -49,6 +52,10 @@ class EnergyVadWakeDetector:
 
     def process(self, chunk: bytes) -> VadDecision:
         energy = self._calculate_energy(chunk)
+        # 回调音量值，归一化到0-100
+        if self.volume_callback:
+            normalized_volume = min(100, int(energy / self._max_energy * 100))
+            self.volume_callback(normalized_volume)
         threshold = max(self.base_threshold, self._noise_floor * self.multiplier)
         raw_active = energy >= threshold
         self._pre_roll.append(chunk)
