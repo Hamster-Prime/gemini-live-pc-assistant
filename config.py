@@ -4,7 +4,7 @@ import json
 import logging
 import os
 import threading
-from dataclasses import asdict, dataclass, fields
+from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 

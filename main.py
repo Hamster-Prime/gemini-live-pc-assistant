@@ -10,8 +10,6 @@ import logging.handlers
 import signal
 import sys
 import threading
-import time
-from collections.abc import Callable
 from pathlib import Path
 
 import keyboard
