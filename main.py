@@ -407,6 +407,9 @@ class AssistantApp:
             self._main_window.set_state(state)
         if self._tray:
             self._tray.update_status(state)
+        # Reconnection while in manual mode: send activity_start
+        if connected and self._manual_mode and self._gemini_session:
+            self._gemini_session.send_activity_start()
 
     def _on_status(self, message: str) -> None:
         LOGGER.info("Gemini 状态: %s", message)
