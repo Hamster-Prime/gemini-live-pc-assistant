@@ -63,6 +63,7 @@ class AudioStreamManager:
         self._input_thread: threading.Thread | None = None
         self._output_buffer = bytearray()
         self._output_prebuffer_bytes = self.output_chunk_bytes * 2
+        self._output_max_bytes = self.output_chunk_bytes * 2000  # ~60s at 24kHz
         self._output_buffer_lock = threading.Lock()
         self._output_primed = False
         self._last_output_data_time = 0.0
@@ -151,9 +152,11 @@ class AudioStreamManager:
             with self._playback_lock:
                 if generation != self._playback_generation:
                     return
-            self._output_buffer.extend(audio_bytes)
-            self._last_output_data_time = time.monotonic()
-            self._output_active = True
+            # Drop incoming data if buffer is full to prevent unbounded growth
+            if len(self._output_buffer) < self._output_max_bytes:
+                self._output_buffer.extend(audio_bytes)
+                self._last_output_data_time = time.monotonic()
+                self._output_active = True
 
     def clear_output(self) -> None:
         with self._playback_lock:
