@@ -559,6 +559,13 @@ class PCController:
                 continue
             if part in special_keys:
                 pyautogui.press(special_keys[part])
+            elif any(ord(c) > 127 for c in part):
+                old_clipboard = pyperclip.paste()
+                pyperclip.copy(part)
+                time.sleep(0.05)
+                pyautogui.hotkey("ctrl", "v")
+                time.sleep(0.1)
+                pyperclip.copy(old_clipboard)
             else:
                 pyautogui.write(part, interval=0.02)
         return {"ok": True, "action": "type_keys", "keys": keys}
