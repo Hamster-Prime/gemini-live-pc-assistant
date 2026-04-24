@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import logging
 import os
 import subprocess
 import time
 from datetime import datetime
 from pathlib import Path
 from typing import Any
+
+LOGGER = logging.getLogger(__name__)
 
 import pyautogui
 import pyperclip
@@ -186,8 +189,6 @@ class PCController:
                 win32clipboard.CloseClipboard()
                 copied_to_clipboard = True
             except Exception as clipboard_exc:
-                import logging
-                LOGGER = logging.getLogger(__name__)
                 LOGGER.debug(f"复制截图到剪贴板失败: {clipboard_exc}")
             
             self._cleanup_old_screenshots()
