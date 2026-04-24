@@ -329,6 +329,23 @@ class MainWindow:
             self._root.deiconify()
             self._root.lift()
 
+    def update_volume(self, volume: int) -> None:
+        """Update volume indicator in status bar."""
+        if self._root is None or self._status_var is None:
+            return
+        try:
+            bar_len = volume // 5  # 0-20 blocks
+            bar = "|" * bar_len + "." * (20 - bar_len)
+            cfg = self._config_getter()
+            status_parts = [f"热键: {cfg.hotkey}", f"模型: {cfg.model}"]
+            if cfg.silent_mode:
+                status_parts.append("【静默模式】")
+            status_parts.append(f"音量: [{bar}] {volume}%")
+            status_text = "    ".join(status_parts)
+            self._root.after(0, lambda: self._status_var.set(status_text))
+        except Exception:
+            pass
+
 
 # ======================================================================
 # 帮助窗口
@@ -840,3 +857,7 @@ class FloatingStatusWindow:
             self._root.after(0, lambda: self._root.attributes("-alpha", safe_opacity))
         except Exception:
             pass
+
+    def update_volume(self, volume: int) -> None:
+        """Volume indicator - no-op for floating window (too small)."""
+        pass

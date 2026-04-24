@@ -615,11 +615,14 @@ class AssistantApp:
             if self._main_window:
                 self._main_window.set_status_text("代理配置已更新，正在重启会话...")
 
-        # 重建唤醒检测器，添加音量回调
+        # 重建唤醒检测器，添加音量回调（节流：每200ms最多更新一次）
+        import time as _time
+        _last_vol_update = [0.0]  # mutable container for closure
         def on_volume_update(volume: int) -> None:
-            """音量更新回调，把音量值传给界面显示"""
-            if self._floating_status:
-                self._floating_status.update_volume(volume)
+            now = _time.monotonic()
+            if now - _last_vol_update[0] < 0.2:
+                return
+            _last_vol_update[0] = now
             if self._main_window:
                 self._main_window.update_volume(volume)
         
