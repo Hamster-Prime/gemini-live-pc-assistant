@@ -339,11 +339,16 @@ class PCController:
 
     def run_command(self, command: str, timeout: int = 10) -> dict[str, Any]:
         """执行 shell 命令并返回输出。"""
-        dangerous = ["format", "del /s", "rmdir /s", "rd /s", "shutdown", "reboot"]
+        dangerous = [
+            "format ", "del /s", "rmdir /s", "rd /s",
+            "shutdown", "reboot", "reg delete", "reg add",
+            "bcdedit", "diskpart", "cipher /w", "sfc /",
+            "net user", "net localgroup", "netsh firewall",
+        ]
         cmd_lower = command.lower().strip()
         for d in dangerous:
             if d in cmd_lower:
-                return {"ok": False, "error": f"危险命令被阻止: {d}"}
+                return {"ok": False, "error": f"危险命令被阻止: {d.strip()}"}
         try:
             result = subprocess.run(
                 command, capture_output=True, text=True, shell=True,
