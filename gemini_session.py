@@ -230,7 +230,8 @@ class GeminiLiveSession:
         if go_away is not None:
             time_left = getattr(go_away, "time_left", None)
             if time_left is not None:
-                self._notify_status(f"服务端提示会话即将结束，剩余 {time_left} 秒。")
+                self._notify_status(f"服务端提示会话即将结束，剩余 {time_left} 秒，准备重连。")
+            asyncio.get_event_loop().call_later(max(1.0, float(time_left or 2)), self._trigger_reconnect)
 
     async def _handle_tool_call(self, session: Any, tool_call: Any) -> None:
         function_calls = getattr(tool_call, "function_calls", None) or []
@@ -385,4 +386,9 @@ class GeminiLiveSession:
 
     def _notify_connection(self, connected: bool) -> None:
         self._on_connection_change(connected)
+
+    def _trigger_reconnect(self) -> None:
+        """主动触发重连（关闭当前会话，让 _run 循环重连）。"""
+        if self._loop is not None:
+            asyncio.run_coroutine_threadsafe(self._close_current_session(), self._loop)
 
