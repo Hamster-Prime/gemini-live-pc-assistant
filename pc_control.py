@@ -506,6 +506,13 @@ class PCController:
             "shutdown", "reboot", "reg delete", "reg add",
             "bcdedit", "diskpart", "cipher /w", "sfc /",
             "net user", "net localgroup", "netsh firewall",
+            "taskkill /f", "taskkill /im",
+            "attrib -r -h -s",
+            "icacls", "takeown",
+            "remove-item -recurse -force",
+            "remove-itemproperty",
+            "set-executionpolicy unrestricted",
+            "-verb runas",
         ]
         cmd_lower = command.lower().strip()
         for d in dangerous:
