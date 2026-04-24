@@ -263,24 +263,24 @@ class PCController:
 
     def list_windows(self) -> dict[str, Any]:
         """列出所有可见窗口。"""
-        import ctypes
-        from ctypes import wintypes
-
-        user32 = ctypes.windll.user32
-        windows = []
-
-        def _enum_callback(hwnd, _lparam):
-            if user32.IsWindowVisible(hwnd):
-                length = user32.GetWindowTextLengthW(hwnd)
-                if length > 0:
-                    buf = ctypes.create_unicode_buffer(length + 1)
-                    user32.GetWindowTextW(hwnd, buf, length + 1)
-                    windows.append({"hwnd": hwnd, "title": buf.value})
-            return True
-
-        WNDENUMPROC = ctypes.WINFUNCTYPE(ctypes.c_bool, wintypes.HWND, wintypes.LPARAM)
-        user32.EnumWindows(WNDENUMPROC(_enum_callback), 0)
-        return {"ok": True, "action": "list_windows", "windows": windows}
+        try:
+            import ctypes
+            from ctypes import wintypes
+            user32 = ctypes.windll.user32
+            windows = []
+            def _enum_callback(hwnd, _lparam):
+                if user32.IsWindowVisible(hwnd):
+                    length = user32.GetWindowTextLengthW(hwnd)
+                    if length > 0:
+                        buf = ctypes.create_unicode_buffer(length + 1)
+                        user32.GetWindowTextW(hwnd, buf, length + 1)
+                        windows.append({"hwnd": hwnd, "title": buf.value})
+                return True
+            WNDENUMPROC = ctypes.WINFUNCTYPE(ctypes.c_bool, wintypes.HWND, wintypes.LPARAM)
+            user32.EnumWindows(WNDENUMPROC(_enum_callback), 0)
+            return {"ok": True, "action": "list_windows", "windows": windows}
+        except Exception as exc:
+            return {"ok": False, "error": str(exc)}
 
     @staticmethod
     def _find_window_by_title(title: str) -> int:
