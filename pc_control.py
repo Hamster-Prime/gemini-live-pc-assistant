@@ -167,6 +167,29 @@ class PCController:
             image = pyautogui.screenshot()
             image.save(path)
             width, height = image.size
+            
+            # 复制图片到剪贴板（Windows专属）
+            copied_to_clipboard = False
+            try:
+                import io
+                import win32clipboard
+                import win32con
+                
+                output = io.BytesIO()
+                image.convert("RGB").save(output, "BMP")
+                data = output.getvalue()[14:]  # 去掉BMP文件头（前14字节）
+                output.close()
+                
+                win32clipboard.OpenClipboard()
+                win32clipboard.EmptyClipboard()
+                win32clipboard.SetClipboardData(win32con.CF_DIB, data)
+                win32clipboard.CloseClipboard()
+                copied_to_clipboard = True
+            except Exception as clipboard_exc:
+                import logging
+                LOGGER = logging.getLogger(__name__)
+                LOGGER.debug(f"复制截图到剪贴板失败: {clipboard_exc}")
+            
             self._cleanup_old_screenshots()
             return {
                 "ok": True,
@@ -174,6 +197,7 @@ class PCController:
                 "path": str(path),
                 "width": width,
                 "height": height,
+                "copied_to_clipboard": copied_to_clipboard,
             }
         except Exception as exc:
             return {"ok": False, "error": f"截图失败: {exc}"}
