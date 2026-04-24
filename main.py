@@ -413,6 +413,25 @@ class AssistantApp:
             if self._main_window:
                 self._main_window.set_assistant_text(text)
 
+    def _send_notification(self, title: str, message: str) -> None:
+        """发送系统通知（仅Windows）"""
+        try:
+            # 尝试使用Windows Toast通知
+            from win10toast import ToastNotifier
+            toaster = ToastNotifier()
+            toaster.show_toast(
+                title,
+                message,
+                icon_path=None,
+                duration=5,
+                threaded=True
+            )
+        except ImportError:
+            # 如果没有安装win10toast，使用简单的弹窗提示（不推荐，会打断用户）
+            LOGGER.debug("win10toast未安装，无法发送系统通知")
+        except Exception as exc:
+            LOGGER.debug(f"发送通知失败: {exc}")
+    
     def _on_audio_output(self, audio_bytes: bytes, sample_rate: int) -> None:
         if self._config.silent_mode:
             return  # 静默模式下不播放语音
@@ -429,6 +448,16 @@ class AssistantApp:
             self._floating_status.set_state("listening" if self._listening else "idle")
         if self._main_window:
             self._main_window.set_state("listening" if self._listening else "idle")
+        
+        # 主窗口不可见时发送系统通知
+        if self._main_window and self._main_window._root:
+            try:
+                state = self._main_window._root.state()
+                if state in ("withdrawn", "iconic"):
+                    # 窗口隐藏或最小化，发送通知
+                    self._send_notification("Gemini 助手", "您有新的回复消息，点击查看详情")
+            except Exception as exc:
+                LOGGER.debug(f"检查窗口状态失败: {exc}")
 
     def _on_interrupted(self) -> None:
         LOGGER.debug("收到 Gemini 中断信号,清空播放缓冲")
