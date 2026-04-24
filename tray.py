@@ -51,18 +51,14 @@ class TrayManager:
         self._status_getter = status_getter
         self._icon: pystray.Icon | None = None
         self._current_status = "disconnected"
-        self._status_item: pystray.MenuItem | None = None
 
     def run(self) -> None:
         """阻塞运行托盘图标。"""
-        self._status_item = pystray.MenuItem(
-            f"状态: {_STATUS_LABELS.get(self._current_status, self._current_status)}",
-            lambda: None,
-            enabled=False,
-        )
+        def _status_text(icon: pystray.Icon, item: pystray.MenuItem) -> str:
+            return f"状态: {_STATUS_LABELS.get(self._current_status, self._current_status)}"
 
         menu = pystray.Menu(
-            self._status_item,
+            pystray.MenuItem(_status_text, lambda: None, enabled=False),
             pystray.Menu.SEPARATOR,
             pystray.MenuItem("设置", self._on_settings_click),
             pystray.Menu.SEPARATOR,
