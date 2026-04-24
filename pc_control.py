@@ -374,6 +374,7 @@ class PCController:
 
     def run_command(self, command: str, timeout: int = 10) -> dict[str, Any]:
         """执行 shell 命令并返回输出。"""
+        timeout = max(1, min(60, int(timeout)))
         dangerous = [
             "format ", "del /s", "rmdir /s", "rd /s",
             "shutdown", "reboot", "reg delete", "reg add",
@@ -517,17 +518,24 @@ class PCController:
     def list_directory(self, path: str = ".") -> dict[str, Any]:
         """列出目录内容。"""
         try:
-            p = Path(path)
+            p = Path(path).resolve()
             if not p.exists():
                 return {"ok": False, "error": f"目录不存在: {path}"}
+            if not p.is_dir():
+                return {"ok": False, "error": f"不是目录: {path}"}
             items = []
-            for item in sorted(p.iterdir()):
-                items.append({
-                    "name": item.name,
-                    "type": "dir" if item.is_dir() else "file",
-                    "size": item.stat().st_size if item.is_file() else None,
-                })
-            return {"ok": True, "action": "list_directory", "path": str(p), "items": items[:100]}
+            for item in p.iterdir():
+                try:
+                    items.append({
+                        "name": item.name,
+                        "type": "dir" if item.is_dir() else "file",
+                        "size": item.stat().st_size if item.is_file() else None,
+                    })
+                except (PermissionError, OSError):
+                    continue
+                if len(items) >= 100:
+                    break
+            return {"ok": True, "action": "list_directory", "path": str(p), "items": items}
         except Exception as exc:
             return {"ok": False, "error": str(exc)}
 
