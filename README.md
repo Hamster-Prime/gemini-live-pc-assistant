@@ -6,7 +6,13 @@
 
 - **实时语音对话**：通过 Gemini Live API 实现低延迟双向语音交互
 - **唤醒词检测**：基于能量 VAD（语音活动检测），无需额外唤醒词模型
-- **热键控制**：默认 `Ctrl+Space` 切换手动监听模式
+- **热键控制**：默认 `Ctrl+Space` 切换手动监听/按住说话
+- **静默模式**：开启后仅显示文字回复，不播放语音
+- **开机自启动**：支持在设置中开启/关闭
+- **网络代理**：支持配置 HTTP/HTTPS 代理
+- **对话导出**：支持导出对话历史为 Markdown 文件
+- **窗口记忆**：主窗口位置和大小自动保存
+- **系统通知**：主窗口隐藏时新消息弹出通知
 - **PC 操控工具**（49 个）：
   - 鼠标：click、double_click、right_click、move、scroll、drag、wait_and_click
   - 键盘：type_text（支持中文）、press_key、hotkey、type_keys
@@ -136,6 +142,14 @@ python main.py
 | `screenshot_dir` | `runtime/screenshots` | 截图保存目录 |
 | `max_screenshots` | `50` | 最大截图保留数量 |
 | `status_window_opacity` | `0.85` | 悬浮窗透明度 (0.1-1.0) |
+| `silent_mode` | `false` | 静默模式（仅文字回复，不播放语音） |
+| `auto_start` | `false` | 开机自动启动 |
+| `http_proxy` | `""` | HTTP 代理地址 |
+| `https_proxy` | `""` | HTTPS 代理地址 |
+| `main_window_x` | `-1` | 主窗口 X 坐标（-1=居中） |
+| `main_window_y` | `-1` | 主窗口 Y 坐标（-1=居中） |
+| `main_window_width` | `720` | 主窗口宽度 |
+| `main_window_height` | `520` | 主窗口高度 |
 
 ## 项目结构
 
@@ -149,7 +163,7 @@ gemini-live-pc-assistant/
 ├── pc_control.py        # PC 控制实现（pyautogui）
 ├── wake_word.py         # 基于能量的 VAD 唤醒检测
 ├── tray.py              # pystray 系统托盘
-├── gui.py               # tkinter 设置窗口 + 悬浮状态窗
+├── gui.py               # tkinter 主窗口 + 设置窗口 + 悬浮状态窗 + 帮助窗口
 ├── requirements.txt     # Python 依赖
 └── README.md            # 本文件
 ```
