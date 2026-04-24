@@ -424,6 +424,7 @@ class AssistantApp:
         return self._muted
 
     def _on_settings_saved(self, new_config: AppConfig) -> None:
+        old_config = self._config
         self._config = new_config
         self._tool_registry = ToolRegistry(new_config)
 
@@ -436,6 +437,19 @@ class AssistantApp:
             pre_roll_ms=new_config.pre_roll_ms,
             chunk_ms=new_config.chunk_ms,
         )
+
+        # 音频设备配置变更时重启音频流
+        audio_changed = (
+            old_config.input_device_index != new_config.input_device_index
+            or old_config.output_device_index != new_config.output_device_index
+            or old_config.input_device_rate != new_config.input_device_rate
+            or old_config.output_device_rate != new_config.output_device_rate
+            or old_config.chunk_ms != new_config.chunk_ms
+        )
+        if audio_changed and self._audio_stream:
+            LOGGER.info("音频设备配置已变更，重启音频流")
+            self._audio_stream.stop()
+            self._init_audio()
 
         # 重启 Gemini 会话以应用新配置
         if self._gemini_session:
