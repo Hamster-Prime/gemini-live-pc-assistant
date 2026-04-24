@@ -456,11 +456,13 @@ class PCController:
             return {"ok": False, "error": str(exc)}
 
     def write_file(self, path: str, content: str) -> dict[str, Any]:
-        """写入文本文件。"""
+        """写入文本文件（原子写入）。"""
         try:
             p = Path(path)
             p.parent.mkdir(parents=True, exist_ok=True)
-            p.write_text(content, encoding="utf-8")
+            tmp = p.with_suffix(p.suffix + ".tmp")
+            tmp.write_text(content, encoding="utf-8")
+            tmp.replace(p)
             return {"ok": True, "action": "write_file", "path": str(p), "size": len(content)}
         except Exception as exc:
             return {"ok": False, "error": str(exc)}
