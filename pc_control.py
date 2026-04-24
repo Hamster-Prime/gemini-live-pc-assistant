@@ -480,7 +480,13 @@ class PCController:
     def read_file(self, path: str) -> dict[str, Any]:
         """读取文本文件内容。"""
         try:
-            p = Path(path)
+            p = Path(path).resolve()
+            # 阻止读取敏感系统路径
+            blocked = ["windows/system32", "windows/syswow64", "windows/system", "/etc/shadow", "/etc/passwd"]
+            path_lower = str(p).lower()
+            for b in blocked:
+                if b in path_lower:
+                    return {"ok": False, "error": "不允许读取系统文件"}
             if not p.exists():
                 return {"ok": False, "error": f"文件不存在: {path}"}
             if p.stat().st_size > 1024 * 1024:  # 1MB limit
