@@ -243,10 +243,28 @@ class PCController:
         return {"ok": True, "action": "list_windows", "windows": windows}
 
     def focus_window(self, title: str) -> dict[str, Any]:
-        """将指定标题的窗口带到前台。"""
+        """将指定标题的窗口带到前台（支持部分匹配）。"""
         import ctypes
         user32 = ctypes.windll.user32
         hwnd = user32.FindWindowW(None, title)
+        if not hwnd:
+            # 尝试部分匹配
+            from ctypes import wintypes
+            WNDENUMPROC = ctypes.WINFUNCTYPE(ctypes.c_bool, wintypes.HWND, wintypes.LPARAM)
+            found_hwnd = None
+            def _enum(hwnd, _lparam):
+                nonlocal found_hwnd
+                if user32.IsWindowVisible(hwnd):
+                    length = user32.GetWindowTextLengthW(hwnd)
+                    if length > 0:
+                        buf = ctypes.create_unicode_buffer(length + 1)
+                        user32.GetWindowTextW(hwnd, buf, length + 1)
+                        if title.lower() in buf.value.lower():
+                            found_hwnd = hwnd
+                            return False  # 停止枚举
+                return True
+            WNDENUMPROC(_enum)(0)
+            hwnd = found_hwnd
         if not hwnd:
             return {"ok": False, "error": f"未找到窗口: {title}"}
         user32.SetForegroundWindow(hwnd)
