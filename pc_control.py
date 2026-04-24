@@ -61,26 +61,35 @@ class PCController:
         self._cleanup_old_screenshots()
 
     def mouse_click(self, x: int, y: int, button: str = "left") -> dict[str, Any]:
-        self._validate_button(button)
-        width, height = pyautogui.size()
-        x = max(0, min(int(x), width - 1))
-        y = max(0, min(int(y), height - 1))
-        pyautogui.click(x=x, y=y, button=button)
-        return {"ok": True, "action": "mouse_click", "x": x, "y": y, "button": button}
+        try:
+            self._validate_button(button)
+            width, height = pyautogui.size()
+            x = max(0, min(int(x), width - 1))
+            y = max(0, min(int(y), height - 1))
+            pyautogui.click(x=x, y=y, button=button)
+            return {"ok": True, "action": "mouse_click", "x": x, "y": y, "button": button}
+        except Exception as exc:
+            return {"ok": False, "error": str(exc), "action": "mouse_click", "x": x, "y": y}
 
     def mouse_move(self, x: int, y: int) -> dict[str, Any]:
-        width, height = pyautogui.size()
-        x = max(0, min(int(x), width - 1))
-        y = max(0, min(int(y), height - 1))
-        pyautogui.moveTo(x, y, duration=0.08)
-        return {"ok": True, "action": "mouse_move", "x": x, "y": y}
+        try:
+            width, height = pyautogui.size()
+            x = max(0, min(int(x), width - 1))
+            y = max(0, min(int(y), height - 1))
+            pyautogui.moveTo(x, y, duration=0.08)
+            return {"ok": True, "action": "mouse_move", "x": x, "y": y}
+        except Exception as exc:
+            return {"ok": False, "error": str(exc), "action": "mouse_move", "x": x, "y": y}
 
     def mouse_scroll(self, clicks: int, x: int | None = None, y: int | None = None) -> dict[str, Any]:
-        clicks = max(-50, min(50, int(clicks)))
-        if x is not None and y is not None:
-            pyautogui.moveTo(int(x), int(y), duration=0.08)
-        pyautogui.scroll(clicks)
-        return {"ok": True, "action": "mouse_scroll", "clicks": clicks, "x": x, "y": y}
+        try:
+            clicks = max(-50, min(50, int(clicks)))
+            if x is not None and y is not None:
+                pyautogui.moveTo(int(x), int(y), duration=0.08)
+            pyautogui.scroll(clicks)
+            return {"ok": True, "action": "mouse_scroll", "clicks": clicks, "x": x, "y": y}
+        except Exception as exc:
+            return {"ok": False, "error": str(exc), "action": "mouse_scroll", "clicks": clicks, "x": x, "y": y}
 
     def type_text(self, text: str) -> dict[str, Any]:
         """输入文本，支持中文等非 ASCII 字符（通过剪贴板）。"""
@@ -105,24 +114,33 @@ class PCController:
         return {"ok": True, "action": "type_text", "text": text}
 
     def press_key(self, key: str) -> dict[str, Any]:
-        pyautogui.press(key)
-        return {"ok": True, "action": "press_key", "key": key}
+        try:
+            pyautogui.press(key)
+            return {"ok": True, "action": "press_key", "key": key}
+        except Exception as exc:
+            return {"ok": False, "error": str(exc), "action": "press_key", "key": key}
 
     def hotkey(self, *keys: str) -> dict[str, Any]:
         normalized = [key for key in keys if key]
         if not normalized:
-            raise ValueError("组合键不能为空")
-        pyautogui.hotkey(*normalized)
-        return {"ok": True, "action": "hotkey", "keys": normalized}
+            return {"ok": False, "error": "组合键不能为空", "action": "hotkey"}
+        try:
+            pyautogui.hotkey(*normalized)
+            return {"ok": True, "action": "hotkey", "keys": normalized}
+        except Exception as exc:
+            return {"ok": False, "error": str(exc), "action": "hotkey", "keys": normalized}
 
     def open_app(self, name: str) -> dict[str, Any]:
         target = self._normalize_app_name(name)
-        if hasattr(os, "startfile") and Path(target).exists():
-            os.startfile(target)  # type: ignore[attr-defined]
-        else:
-            # Use list form to avoid shell injection
-            subprocess.Popen(["cmd", "/c", "start", "", target], shell=False)
-        return {"ok": True, "action": "open_app", "name": name, "target": target}
+        try:
+            if hasattr(os, "startfile") and Path(target).exists():
+                os.startfile(target)  # type: ignore[attr-defined]
+            else:
+                # Use list form to avoid shell injection
+                subprocess.Popen(["cmd", "/c", "start", "", target], shell=False)
+            return {"ok": True, "action": "open_app", "name": name, "target": target}
+        except Exception as exc:
+            return {"ok": False, "error": str(exc), "action": "open_app", "name": name}
 
     def close_app(self, name: str) -> dict[str, Any]:
         target = self._normalize_app_name(name)
@@ -160,30 +178,36 @@ class PCController:
 
     def get_pixel_color(self, x: int, y: int) -> dict[str, Any]:
         """获取指定坐标的像素颜色。"""
-        width, height = pyautogui.size()
-        x = max(0, min(int(x), width - 1))
-        y = max(0, min(int(y), height - 1))
-        r, g, b = pyautogui.pixel(x, y)
-        hex_color = f"#{r:02x}{g:02x}{b:02x}"
-        return {
-            "ok": True,
-            "action": "get_pixel_color",
-            "x": x, "y": y,
-            "r": r, "g": g, "b": b,
-            "hex": hex_color,
-        }
+        try:
+            width, height = pyautogui.size()
+            x = max(0, min(int(x), width - 1))
+            y = max(0, min(int(y), height - 1))
+            r, g, b = pyautogui.pixel(x, y)
+            hex_color = f"#{r:02x}{g:02x}{b:02x}"
+            return {
+                "ok": True,
+                "action": "get_pixel_color",
+                "x": x, "y": y,
+                "r": r, "g": g, "b": b,
+                "hex": hex_color,
+            }
+        except Exception as exc:
+            return {"ok": False, "error": str(exc), "action": "get_pixel_color", "x": x, "y": y}
 
     def get_screen_info(self) -> dict[str, Any]:
-        width, height = pyautogui.size()
-        x, y = pyautogui.position()
-        return {
-            "ok": True,
-            "action": "get_screen_info",
-            "width": width,
-            "height": height,
-            "mouse_x": x,
-            "mouse_y": y,
-        }
+        try:
+            width, height = pyautogui.size()
+            x, y = pyautogui.position()
+            return {
+                "ok": True,
+                "action": "get_screen_info",
+                "width": width,
+                "height": height,
+                "mouse_x": x,
+                "mouse_y": y,
+            }
+        except Exception as exc:
+            return {"ok": False, "error": str(exc), "action": "get_screen_info"}
 
     @staticmethod
     def _validate_button(button: str) -> None:
@@ -208,44 +232,59 @@ class PCController:
 
     def get_mouse_position(self) -> dict[str, Any]:
         """获取当前鼠标位置。"""
-        x, y = pyautogui.position()
-        return {"ok": True, "action": "get_mouse_position", "x": x, "y": y}
+        try:
+            x, y = pyautogui.position()
+            return {"ok": True, "action": "get_mouse_position", "x": x, "y": y}
+        except Exception as exc:
+            return {"ok": False, "error": str(exc)}
 
     def double_click(self, x: int, y: int) -> dict[str, Any]:
         """双击指定坐标。"""
-        width, height = pyautogui.size()
-        x = max(0, min(int(x), width - 1))
-        y = max(0, min(int(y), height - 1))
-        pyautogui.doubleClick(x=x, y=y)
-        return {"ok": True, "action": "double_click", "x": x, "y": y}
+        try:
+            width, height = pyautogui.size()
+            x = max(0, min(int(x), width - 1))
+            y = max(0, min(int(y), height - 1))
+            pyautogui.doubleClick(x=x, y=y)
+            return {"ok": True, "action": "double_click", "x": x, "y": y}
+        except Exception as exc:
+            return {"ok": False, "error": str(exc), "action": "double_click", "x": x, "y": y}
 
     def right_click(self, x: int, y: int) -> dict[str, Any]:
         """右键点击指定坐标。"""
-        width, height = pyautogui.size()
-        x = max(0, min(int(x), width - 1))
-        y = max(0, min(int(y), height - 1))
-        pyautogui.rightClick(x=x, y=y)
-        return {"ok": True, "action": "right_click", "x": x, "y": y}
+        try:
+            width, height = pyautogui.size()
+            x = max(0, min(int(x), width - 1))
+            y = max(0, min(int(y), height - 1))
+            pyautogui.rightClick(x=x, y=y)
+            return {"ok": True, "action": "right_click", "x": x, "y": y}
+        except Exception as exc:
+            return {"ok": False, "error": str(exc), "action": "right_click", "x": x, "y": y}
 
     def drag(self, x1: int, y1: int, x2: int, y2: int, duration: float = 0.5) -> dict[str, Any]:
         """从 (x1,y1) 拖拽到 (x2,y2)。"""
-        width, height = pyautogui.size()
-        x1 = max(0, min(int(x1), width - 1))
-        y1 = max(0, min(int(y1), height - 1))
-        x2 = max(0, min(int(x2), width - 1))
-        y2 = max(0, min(int(y2), height - 1))
-        pyautogui.moveTo(x1, y1)
-        pyautogui.dragTo(x2, y2, duration=duration, button="left")
-        return {"ok": True, "action": "drag", "x1": x1, "y1": y1, "x2": x2, "y2": y2}
+        try:
+            width, height = pyautogui.size()
+            x1 = max(0, min(int(x1), width - 1))
+            y1 = max(0, min(int(y1), height - 1))
+            x2 = max(0, min(int(x2), width - 1))
+            y2 = max(0, min(int(y2), height - 1))
+            pyautogui.moveTo(x1, y1)
+            pyautogui.dragTo(x2, y2, duration=duration, button="left")
+            return {"ok": True, "action": "drag", "x1": x1, "y1": y1, "x2": x2, "y2": y2}
+        except Exception as exc:
+            return {"ok": False, "error": str(exc), "action": "drag", "x1": x1, "y1": y1, "x2": x2, "y2": y2}
 
     def wait_and_click(self, x: int, y: int, timeout: float = 5.0) -> dict[str, Any]:
         """等待指定时间后点击坐标。"""
-        width, height = pyautogui.size()
-        x = max(0, min(int(x), width - 1))
-        y = max(0, min(int(y), height - 1))
-        time.sleep(max(0.0, float(timeout)))
-        pyautogui.click(x=x, y=y)
-        return {"ok": True, "action": "wait_and_click", "x": x, "y": y, "waited": timeout}
+        try:
+            width, height = pyautogui.size()
+            x = max(0, min(int(x), width - 1))
+            y = max(0, min(int(y), height - 1))
+            time.sleep(max(0.0, float(timeout)))
+            pyautogui.click(x=x, y=y)
+            return {"ok": True, "action": "wait_and_click", "x": x, "y": y, "waited": timeout}
+        except Exception as exc:
+            return {"ok": False, "error": str(exc), "action": "wait_and_click", "x": x, "y": y}
 
     def get_active_window(self) -> dict[str, Any]:
         """获取当前活动窗口信息。"""
@@ -453,55 +492,54 @@ class PCController:
         except Exception as exc:
             return {"ok": False, "error": str(exc)}
 
+    def _safe_hotkey(self, *keys: str) -> dict[str, Any]:
+        """安全执行组合键，捕获异常。"""
+        action = "+".join(keys)
+        try:
+            pyautogui.hotkey(*keys)
+            return {"ok": True, "action": action}
+        except Exception as exc:
+            return {"ok": False, "error": str(exc), "action": action}
+
     def select_all(self) -> dict[str, Any]:
         """全选 (Ctrl+A)。"""
-        pyautogui.hotkey("ctrl", "a")
-        return {"ok": True, "action": "select_all"}
+        return self._safe_hotkey("ctrl", "a")
 
     def undo(self) -> dict[str, Any]:
         """撤销 (Ctrl+Z)。"""
-        pyautogui.hotkey("ctrl", "z")
-        return {"ok": True, "action": "undo"}
+        return self._safe_hotkey("ctrl", "z")
 
     def redo(self) -> dict[str, Any]:
         """重做 (Ctrl+Y)。"""
-        pyautogui.hotkey("ctrl", "y")
-        return {"ok": True, "action": "redo"}
+        return self._safe_hotkey("ctrl", "y")
 
     def copy_selection(self) -> dict[str, Any]:
         """复制选中内容 (Ctrl+C)。"""
-        pyautogui.hotkey("ctrl", "c")
-        return {"ok": True, "action": "copy_selection"}
+        return self._safe_hotkey("ctrl", "c")
 
     def paste_from_clipboard(self) -> dict[str, Any]:
         """粘贴剪贴板内容 (Ctrl+V)。"""
-        pyautogui.hotkey("ctrl", "v")
-        return {"ok": True, "action": "paste_from_clipboard"}
+        return self._safe_hotkey("ctrl", "v")
 
     def save_file(self) -> dict[str, Any]:
         """保存文件 (Ctrl+S)。"""
-        pyautogui.hotkey("ctrl", "s")
-        return {"ok": True, "action": "save_file"}
+        return self._safe_hotkey("ctrl", "s")
 
     def close_tab(self) -> dict[str, Any]:
         """关闭当前标签页 (Ctrl+W)。"""
-        pyautogui.hotkey("ctrl", "w")
-        return {"ok": True, "action": "close_tab"}
+        return self._safe_hotkey("ctrl", "w")
 
     def new_tab(self) -> dict[str, Any]:
         """打开新标签页 (Ctrl+T)。"""
-        pyautogui.hotkey("ctrl", "t")
-        return {"ok": True, "action": "new_tab"}
+        return self._safe_hotkey("ctrl", "t")
 
     def switch_window(self) -> dict[str, Any]:
         """切换窗口 (Alt+Tab)。"""
-        pyautogui.hotkey("alt", "tab")
-        return {"ok": True, "action": "switch_window"}
+        return self._safe_hotkey("alt", "tab")
 
     def lock_screen(self) -> dict[str, Any]:
         """锁定屏幕 (Win+L)。"""
-        pyautogui.hotkey("win", "l")
-        return {"ok": True, "action": "lock_screen"}
+        return self._safe_hotkey("win", "l")
 
     def read_file(self, path: str) -> dict[str, Any]:
         """读取文本文件内容。"""
