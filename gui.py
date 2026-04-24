@@ -298,6 +298,7 @@ class SettingsWindow:
             ("reconnect_max_delay", "重连最大延迟 (秒)", False),
             ("screenshot_dir", "截图保存目录", False),
             ("max_screenshots", "最大截图保留数量", False),
+            ("status_window_opacity", "悬浮窗透明度 (0.1-1.0)", False),
         ]
 
         for key, label, is_password in fields:
@@ -362,6 +363,7 @@ class SettingsWindow:
                         "reconnect_initial_delay": (0.5, 60.0),
                         "reconnect_max_delay": (1.0, 300.0),
                         "max_screenshots": (1, 200),
+                        "status_window_opacity": (0.1, 1.0),
                     }
                     if key in range_limits:
                         min_val, max_val = range_limits[key]
@@ -462,13 +464,13 @@ class FloatingStatusWindow:
         self._root.title("状态")
         self._root.overrideredirect(True)  # 无边框
         self._root.attributes("-topmost", True)
-        self._root.attributes("-alpha", 0.85)
         self._root.configure(bg="#1E1E1E")
 
         cfg = self._config_getter()
         x = cfg.status_window_x
         y = cfg.status_window_y
         self._root.geometry(f"260x100+{x}+{y}")
+        self._root.attributes("-alpha", max(0.1, min(1.0, cfg.status_window_opacity)))
 
         # 拖拽支持
         self._root.bind("<Button-1>", self._on_drag_start)

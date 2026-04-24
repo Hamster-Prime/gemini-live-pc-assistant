@@ -40,6 +40,7 @@ class AppConfig:
     status_window_y: int = 30
     screenshot_dir: str = "runtime/screenshots"
     max_screenshots: int = 50
+    status_window_opacity: float = 0.85
 
     def resolved_api_key(self) -> str:
         return self.api_key.strip() or os.getenv("GEMINI_API_KEY", "").strip()

@@ -126,6 +126,7 @@ python main.py
 | `reconnect_max_delay` | `12.0` | 重连最大延迟（秒） |
 | `screenshot_dir` | `runtime/screenshots` | 截图保存目录 |
 | `max_screenshots` | `50` | 最大截图保留数量 |
+| `status_window_opacity` | `0.85` | 悬浮窗透明度 (0.1-1.0) |
 
 ## 项目结构
 
