@@ -501,6 +501,10 @@ class AssistantApp:
         LOGGER.info("正在清理资源 ...")
         if self._manual_timer:
             self._manual_timer.cancel()
+        try:
+            keyboard.unhook_all()
+        except Exception:
+            pass
         if self._gemini_session:
             self._gemini_session.stop()
         if self._audio_stream:
