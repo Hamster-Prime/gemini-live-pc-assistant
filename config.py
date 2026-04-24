@@ -42,6 +42,7 @@ class AppConfig:
     max_screenshots: int = 50
     status_window_opacity: float = 0.85
     silent_mode: bool = False
+    auto_start: bool = False
 
     def resolved_api_key(self) -> str:
         return self.api_key.strip() or os.getenv("GEMINI_API_KEY", "").strip()

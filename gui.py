@@ -335,6 +335,7 @@ class SettingsWindow:
             ("max_screenshots", "最大截图保留数量", False),
             ("status_window_opacity", "悬浮窗透明度 (0.1-1.0)", False),
             ("silent_mode", "静默模式（仅文字回复）", False),
+            ("auto_start", "开机自动启动", False),
         ]
 
         self._checkboxes = {}  # 存储复选框变量

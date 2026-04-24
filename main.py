@@ -467,7 +467,7 @@ class AssistantApp:
 
     def is_muted(self) -> bool:
         return self._muted
-    
+
     def toggle_silent_mode(self) -> None:
         """切换静默模式"""
         new_mode = not self._config.silent_mode
@@ -480,6 +480,58 @@ class AssistantApp:
         if self._main_window:
             self._main_window.set_status_text(status_text)
             self._main_window.update_status_bar(self._config)  # 更新状态栏显示
+    
+    def _set_auto_start(self, enable: bool) -> None:
+        """设置或取消开机自启动（仅Windows）"""
+        try:
+            import os
+            import sys
+            import win32com.client
+            
+            shell = win32com.client.Dispatch("WScript.Shell")
+            startup_folder = shell.SpecialFolders("Startup")
+            shortcut_path = os.path.join(startup_folder, "GeminiLivePCAssistant.lnk")
+            
+            if enable:
+                # 创建开机自启动快捷方式
+                shortcut = shell.CreateShortCut(shortcut_path)
+                if getattr(sys, 'frozen', False):
+                    # 打包后的exe文件
+                    target_path = sys.executable
+                    arguments = ""
+                else:
+                    # 开发模式，用Python运行当前脚本
+                    target_path = sys.executable
+                    script_path = os.path.abspath(__file__)
+                    arguments = f'"{script_path}"'
+                
+                shortcut.TargetPath = target_path
+                shortcut.Arguments = arguments
+                shortcut.WorkingDirectory = str(Path(__file__).parent)
+                shortcut.IconLocation = target_path
+                shortcut.save()
+                status_text = "已开启开机自动启动"
+                LOGGER.info(f"{status_text}，快捷方式路径: {shortcut_path}")
+            else:
+                # 删除开机自启动快捷方式
+                if os.path.exists(shortcut_path):
+                    os.remove(shortcut_path)
+                status_text = "已关闭开机自动启动"
+                LOGGER.info(status_text)
+            
+            # 提示用户设置结果
+            if self._floating_status:
+                self._floating_status.set_status_text(status_text)
+            if self._main_window:
+                self._main_window.set_status_text(status_text)
+                
+        except Exception as exc:
+            error_msg = f"设置开机自启动失败: {str(exc)}"
+            LOGGER.exception(error_msg)
+            if self._floating_status:
+                self._floating_status.set_status_text(error_msg)
+            if self._main_window:
+                self._main_window.set_status_text(error_msg)
 
     def toggle_floating_window(self) -> None:
         """切换悬浮窗显示/隐藏"""
@@ -519,6 +571,10 @@ class AssistantApp:
         # 更新悬浮窗透明度(实时生效)
         if self._floating_status and old_config.status_window_opacity != new_config.status_window_opacity:
             self._floating_status.update_opacity(new_config.status_window_opacity)
+
+        # 开机自启动配置变化时更新设置
+        if old_config.auto_start != new_config.auto_start:
+            self._set_auto_start(new_config.auto_start)
 
         # 重建唤醒检测器
         self._wake_detector = EnergyVadWakeDetector(
