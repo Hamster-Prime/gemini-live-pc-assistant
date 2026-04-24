@@ -65,8 +65,9 @@ class PCController:
         if any(ord(c) > 127 for c in text):
             old_clipboard = pyperclip.paste()
             pyperclip.copy(text)
-            pyautogui.hotkey("ctrl", "v")
             time.sleep(0.05)
+            pyautogui.hotkey("ctrl", "v")
+            time.sleep(0.1)
             pyperclip.copy(old_clipboard)
         else:
             pyautogui.write(text, interval=0.02)
