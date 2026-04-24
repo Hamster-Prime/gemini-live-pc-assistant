@@ -135,7 +135,10 @@ class AssistantApp:
         signal.signal(signal.SIGINT, self._signal_handler)
         signal.signal(signal.SIGTERM, self._signal_handler)
 
-        self._init_audio()
+        try:
+            self._init_audio()
+        except Exception as exc:
+            LOGGER.exception("初始化音频流失败: %s", exc)
         self._init_wake_detector()
         self._init_gemini()
         self._register_hotkey()
@@ -667,7 +670,14 @@ class AssistantApp:
         if audio_changed and self._audio_stream:
             LOGGER.info("音频设备配置已变更,重启音频流")
             self._audio_stream.stop()
-            self._init_audio()
+            try:
+                self._init_audio()
+            except Exception as exc:
+                LOGGER.exception("重启音频流失败: %s", exc)
+                if self._floating_status:
+                    self._floating_status.set_status_text("音频重启失败，请检查设备")
+                if self._main_window:
+                    self._main_window.set_status_text("音频重启失败，请检查设备")
 
         # 热键变更时重新注册
         if old_config.hotkey != new_config.hotkey:
