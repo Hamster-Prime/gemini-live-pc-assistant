@@ -7,7 +7,7 @@
 - **实时语音对话**：通过 Gemini Live API 实现低延迟双向语音交互
 - **唤醒词检测**：基于能量 VAD（语音活动检测），无需额外唤醒词模型
 - **热键控制**：默认 `Ctrl+Space` 切换手动监听模式
-- **PC 操控工具**（49 个）：
+- **PC 操控工具**（48 个）：
   - 鼠标：click、double_click、right_click、move、scroll、drag、wait_and_click
   - 键盘：type_text（支持中文）、press_key、hotkey、type_keys
   - 便捷：select_all、undo、redo、copy、paste、save_file、close_tab、new_tab
@@ -134,7 +134,7 @@ gemini-live-pc-assistant/
 ├── config.py            # 配置管理（dataclass + JSON 持久化）
 ├── audio_stream.py      # PyAudio 音频流管理（输入/输出/重采样）
 ├── gemini_session.py    # Gemini Live API 会话管理
-├── tools.py             # 工具注册与分发（49 个 PC 控制工具）
+├── tools.py             # 工具注册与分发（48 个 PC 控制工具）
 ├── pc_control.py        # PC 控制实现（pyautogui）
 ├── wake_word.py         # 基于能量的 VAD 唤醒检测
 ├── tray.py              # pystray 系统托盘
