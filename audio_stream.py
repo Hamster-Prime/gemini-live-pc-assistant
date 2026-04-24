@@ -69,7 +69,6 @@ class AudioStreamManager:
         self._playback_generation = 0
         self._playback_lock = threading.Lock()
         self._output_active = False
-        self._output_active_lock = threading.Lock()
 
     def add_input_listener(self, callback: Callable[[bytes], None]) -> None:
         self._listeners.append(callback)
@@ -145,8 +144,7 @@ class AudioStreamManager:
                     return
             self._output_buffer.extend(audio_bytes)
             self._last_output_data_time = time.monotonic()
-            with self._output_active_lock:
-                self._output_active = True
+            self._output_active = True
 
     def clear_output(self) -> None:
         with self._playback_lock:
@@ -155,15 +153,14 @@ class AudioStreamManager:
         with self._output_buffer_lock:
             self._output_buffer.clear()
             self._output_primed = False
-
-        with self._output_active_lock:
             was_active = self._output_active
             self._output_active = False
+
         if was_active:
             self._notify_output_idle()
 
     def is_output_active(self) -> bool:
-        with self._output_active_lock:
+        with self._output_buffer_lock:
             return self._output_active
 
     def _input_loop(self) -> None:
@@ -225,10 +222,9 @@ class AudioStreamManager:
 
             if time.monotonic() - self._last_output_data_time > 0.2:
                 self._output_primed = False
-                with self._output_active_lock:
-                    if self._output_active:
-                        self._output_active = False
-                        notify_idle = True
+                if self._output_active:
+                    self._output_active = False
+                    notify_idle = True
 
         if notify_idle:
             self._notify_output_idle()

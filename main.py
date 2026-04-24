@@ -141,7 +141,10 @@ class AssistantApp:
         self._init_gemini()
         self._register_hotkey()
 
-        self._floating_status = FloatingStatusWindow(config_getter=self.get_config)
+        self._floating_status = FloatingStatusWindow(
+            config_getter=self.get_config,
+            config_manager=self._config_manager,
+        )
         self._floating_status.start()
 
         self._main_window = MainWindow(

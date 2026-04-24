@@ -276,6 +276,11 @@ class SettingsWindow:
         canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
 
+        # 鼠标滚轮支持
+        def _on_mousewheel(event: tk.Event) -> None:
+            canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+        canvas.bind_all("<MouseWheel>", _on_mousewheel)
+
         # 字段定义
         fields = [
             ("api_key", "Gemini API Key", True),
@@ -383,8 +388,9 @@ class SettingsWindow:
 class FloatingStatusWindow:
     """半透明悬浮窗，显示当前状态、用户和助手文本。"""
 
-    def __init__(self, config_getter: Callable[[], AppConfig]) -> None:
+    def __init__(self, config_getter: Callable[[], AppConfig], config_manager: "ConfigManager | None" = None) -> None:
         self._config_getter = config_getter
+        self._config_manager = config_manager
         self._root: tk.Tk | None = None
         self._thread: threading.Thread | None = None
         self._state_label: tk.Label | None = None
@@ -414,12 +420,14 @@ class FloatingStatusWindow:
             "listening": "聆听中 ...",
             "speaking": "播放中 ...",
             "disconnected": "未连接",
+            "idle": "待机",
         }
         colors = {
             "connected": "#4CAF50",
             "listening": "#2196F3",
             "speaking": "#FFC107",
             "disconnected": "#9E9E9E",
+            "idle": "#607D8B",
         }
         self._update_label(self._state_label, labels.get(state, state), colors.get(state, "#9E9E9E"))
 
@@ -507,12 +515,12 @@ class FloatingStatusWindow:
         if self._root is None:
             return
         try:
-            from config import ConfigManager
-            cm = ConfigManager()
-            cm.update(
-                status_window_x=self._root.winfo_x(),
-                status_window_y=self._root.winfo_y(),
-            )
+            x, y = self._root.winfo_x(), self._root.winfo_y()
+            if self._config_manager is not None:
+                self._config_manager.update(status_window_x=x, status_window_y=y)
+            else:
+                from config import ConfigManager
+                ConfigManager().update(status_window_x=x, status_window_y=y)
         except Exception:
             pass
 
