@@ -119,7 +119,11 @@ class MainWindow:
         """更新状态栏显示"""
         if self._root is None or self._status_var is None:
             return
-        self._root.after(0, lambda: self._status_var.set(f"热键: {config.hotkey}    模型: {config.model}"))
+        status_parts = [f"热键: {config.hotkey}", f"模型: {config.model}"]
+        if config.silent_mode:
+            status_parts.append("【静默模式】")
+        status_text = "    ".join(status_parts)
+        self._root.after(0, lambda: self._status_var.set(status_text))
 
     def set_listening(self, listening: bool) -> None:
         if self._root is None or self._toggle_button is None:
@@ -330,6 +334,7 @@ class SettingsWindow:
             ("screenshot_dir", "截图保存目录", False),
             ("max_screenshots", "最大截图保留数量", False),
             ("status_window_opacity", "悬浮窗透明度 (0.1-1.0)", False),
+            ("silent_mode", "静默模式（输入 True 开启/False 关闭）", False),
         ]
 
         for key, label, is_password in fields:
@@ -371,6 +376,12 @@ class SettingsWindow:
             default = AppConfig()
             for key, value in updates.items():
                 field_default = getattr(default, key, None)
+                # 处理布尔类型
+                if isinstance(field_default, bool):
+                    lower_val = value.strip().lower()
+                    updates[key] = lower_val in ("true", "1", "yes", "on")
+                    continue
+                # 处理数字类型
                 if isinstance(field_default, (int, float)) and not isinstance(field_default, bool):
                     try:
                         if isinstance(field_default, int):

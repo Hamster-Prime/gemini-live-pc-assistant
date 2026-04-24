@@ -26,7 +26,7 @@ LOGGER = logging.getLogger(__name__)
 
 
 def _setup_logging() -> None:
-    """配置日志：控制台 + 滚动文件。"""
+    """配置日志:控制台 + 滚动文件。"""
     log_dir = Path(__file__).parent / "runtime" / "logs"
     log_dir.mkdir(parents=True, exist_ok=True)
     log_file = log_dir / "assistant.log"
@@ -82,20 +82,20 @@ def _check_dependencies() -> None:
         except ImportError:
             missing.append(package)
     if missing:
-        LOGGER.error("缺少必要依赖: %s，请运行: pip install %s", ", ".join(missing), " ".join(missing))
+        LOGGER.error("缺少必要依赖: %s,请运行: pip install %s", ", ".join(missing), " ".join(missing))
         sys.exit(1)
     for module, package in optional:
         try:
             __import__(module)
         except ImportError:
-            LOGGER.warning("可选依赖 %s 未安装，部分功能不可用: pip install %s", package, package)
+            LOGGER.warning("可选依赖 %s 未安装,部分功能不可用: pip install %s", package, package)
 
 
 _check_dependencies()
 
 
 class AssistantApp:
-    """主应用类，协调所有子系统。"""
+    """主应用类,协调所有子系统。"""
 
     VERSION = "1.2.0"
 
@@ -161,6 +161,7 @@ class AssistantApp:
             on_exit=self._exit,
             status_getter=self._get_status_text,
             on_toggle_mute=self.toggle_mute,
+            on_toggle_silent_mode=self.toggle_silent_mode,
             on_toggle_floating=self.toggle_floating_window,
             on_clear_conversation=self.clear_conversation,
             on_restart_session=self.restart_gemini_session,
@@ -169,7 +170,7 @@ class AssistantApp:
         try:
             self._tray.run()
         except KeyboardInterrupt:
-            LOGGER.info("收到键盘中断，正在退出 ...")
+            LOGGER.info("收到键盘中断,正在退出 ...")
         finally:
             self._cleanup()
 
@@ -216,42 +217,42 @@ class AssistantApp:
     def _register_hotkey(self) -> None:
         hotkey = self._config.hotkey
         try:
-            # 注册热键按下和松开事件，支持按住说话
+            # 注册热键按下和松开事件,支持按住说话
             def on_hotkey_press(e):
                 with self._lock:
                     if not self._manual_mode:
                         self._hold_to_talk = True
                         self._on_hotkey_pressed() # 开始聆听
-            
+
             def on_hotkey_release(e):
                 with self._lock:
                     if self._hold_to_talk and self._manual_mode:
                         self._hold_to_talk = False
                         self._finish_manual_listen() # 松开结束
-            
+
             keyboard.add_hotkey(hotkey, callback=on_hotkey_press, suppress=False, trigger_on_release=False)
             self._hotkey_release_callback = on_hotkey_release
             keyboard.on_release_key(hotkey.split('+')[-1], callback=on_hotkey_release, suppress=False)
-            LOGGER.info("已注册热键：%s (支持按住说话)", hotkey)
+            LOGGER.info("已注册热键:%s (支持按住说话)", hotkey)
         except Exception:
             LOGGER.exception("注册热键 %s 失败", hotkey)
 
         # Register mute hotkey (Ctrl+M)
         try:
             keyboard.add_hotkey("ctrl+m", self.toggle_mute, suppress=False)
-            LOGGER.info("已注册静音热键：ctrl+m")
+            LOGGER.info("已注册静音热键:ctrl+m")
         except Exception:
             LOGGER.exception("注册静音热键失败")
-            
+
         # Register open main window hotkey (Ctrl+O)
         try:
             keyboard.add_hotkey("ctrl+o", self._show_main_window, suppress=False)
-            LOGGER.info("已注册打开主窗口热键：ctrl+o")
+            LOGGER.info("已注册打开主窗口热键:ctrl+o")
         except Exception:
             LOGGER.exception("注册打开主窗口热键失败")
 
     # ------------------------------------------------------------------
-    # 配置访问（供回调使用）
+    # 配置访问(供回调使用)
     # ------------------------------------------------------------------
 
     def get_config(self) -> AppConfig:
@@ -265,7 +266,7 @@ class AssistantApp:
     # ------------------------------------------------------------------
 
     def _on_mic_chunk(self, chunk: bytes) -> None:
-        """麦克风数据到达：VAD 检测 → 唤醒词 → 发送到 Gemini。"""
+        """麦克风数据到达:VAD 检测 → 唤醒词 → 发送到 Gemini。"""
         if self._wake_detector is None:
             return
 
@@ -284,7 +285,7 @@ class AssistantApp:
 
         if decision.speech_ended:
             LOGGER.debug("语音活动结束")
-            # 非手动模式下，语音结束自动发送结束标记，触发Gemini回复
+            # 非手动模式下,语音结束自动发送结束标记,触发Gemini回复
             if not self._manual_mode and self._gemini_session and self._gemini_session.is_connected():
                 self._gemini_session.send_activity_end()
                 self._gemini_session.send_audio_stream_end()
@@ -297,12 +298,12 @@ class AssistantApp:
                     self._main_window.set_state("idle")
                     self._main_window.set_listening(False)
 
-        # 发送 pre-roll 音频（语音开始前的缓冲数据）
+        # 发送 pre-roll 音频(语音开始前的缓冲数据)
         if decision.speech_started and decision.emit_chunks:
             if self._gemini_session and self._gemini_session.is_connected():
                 for pre_chunk in decision.emit_chunks:
                     self._gemini_session.send_audio(pre_chunk)
-            # pre-roll 已包含当前 chunk，跳过下面的重复发送
+            # pre-roll 已包含当前 chunk,跳过下面的重复发送
         elif decision.speech_active:
             # 将音频发送到 Gemini
             if self._gemini_session and self._gemini_session.is_connected():
@@ -318,7 +319,7 @@ class AssistantApp:
     # ------------------------------------------------------------------
 
     def _on_hotkey_pressed(self) -> None:
-        """热键按下：切换手动监听模式。"""
+        """热键按下:切换手动监听模式。"""
         if self._manual_mode:
             self._finish_manual_listen()
         else:
@@ -413,6 +414,8 @@ class AssistantApp:
                 self._main_window.set_assistant_text(text)
 
     def _on_audio_output(self, audio_bytes: bytes, sample_rate: int) -> None:
+        if self._config.silent_mode:
+            return  # 静默模式下不播放语音
         if self._audio_stream:
             self._audio_stream.play_output(audio_bytes, sample_rate=sample_rate)
         if self._floating_status:
@@ -428,7 +431,7 @@ class AssistantApp:
             self._main_window.set_state("listening" if self._listening else "idle")
 
     def _on_interrupted(self) -> None:
-        LOGGER.debug("收到 Gemini 中断信号，清空播放缓冲")
+        LOGGER.debug("收到 Gemini 中断信号,清空播放缓冲")
         if self._audio_stream:
             self._audio_stream.clear_output()
 
@@ -465,12 +468,25 @@ class AssistantApp:
     def is_muted(self) -> bool:
         return self._muted
     
+    def toggle_silent_mode(self) -> None:
+        """切换静默模式"""
+        new_mode = not self._config.silent_mode
+        self._config_manager.update(silent_mode=new_mode)
+        self._config.silent_mode = new_mode
+        status_text = "已开启静默模式，将仅显示文字回复" if new_mode else "已关闭静默模式，恢复语音回复"
+        LOGGER.info(status_text)
+        if self._floating_status:
+            self._floating_status.set_status_text(status_text)
+        if self._main_window:
+            self._main_window.set_status_text(status_text)
+            self._main_window.update_status_bar(self._config)  # 更新状态栏显示
+
     def toggle_floating_window(self) -> None:
         """切换悬浮窗显示/隐藏"""
         if self._floating_status:
             self._floating_status.toggle_visibility()
             LOGGER.info("已切换悬浮窗显示状态")
-    
+
     def clear_conversation(self) -> None:
         """清空主窗口对话历史"""
         if self._main_window:
@@ -480,7 +496,7 @@ class AssistantApp:
                 self._floating_status.set_status_text("对话历史已清空")
             if self._main_window:
                 self._main_window.set_status_text("对话历史已清空")
-    
+
     def restart_gemini_session(self) -> None:
         """重启Gemini会话"""
         if self._gemini_session:
@@ -495,12 +511,12 @@ class AssistantApp:
         old_config = self._config
         self._config = new_config
         self._tool_registry = ToolRegistry(new_config)
-        
+
         # 更新主界面状态栏显示
         if self._main_window:
             self._main_window.update_status_bar(new_config)
-        
-        # 更新悬浮窗透明度（实时生效）
+
+        # 更新悬浮窗透明度(实时生效)
         if self._floating_status and old_config.status_window_opacity != new_config.status_window_opacity:
             self._floating_status.update_opacity(new_config.status_window_opacity)
 
@@ -523,7 +539,7 @@ class AssistantApp:
             or old_config.chunk_ms != new_config.chunk_ms
         )
         if audio_changed and self._audio_stream:
-            LOGGER.info("音频设备配置已变更，重启音频流")
+            LOGGER.info("音频设备配置已变更,重启音频流")
             self._audio_stream.stop()
             self._init_audio()
 
@@ -538,23 +554,23 @@ class AssistantApp:
             except Exception:
                 pass
             try:
-                # 重新注册新热键（支持按住说话）
+                # 重新注册新热键(支持按住说话)
                 def on_hotkey_press(e):
                     with self._lock:
                         if not self._manual_mode:
                             self._hold_to_talk = True
                             self._on_hotkey_pressed() # 开始聆听
-                
+
                 def on_hotkey_release(e):
                     with self._lock:
                         if self._hold_to_talk and self._manual_mode:
                             self._hold_to_talk = False
                             self._finish_manual_listen() # 松开结束
-                
+
                 keyboard.add_hotkey(new_config.hotkey, callback=on_hotkey_press, suppress=False, trigger_on_release=False)
                 self._hotkey_release_callback = on_hotkey_release
                 keyboard.on_release_key(new_config.hotkey.split('+')[-1], callback=on_hotkey_release, suppress=False)
-                LOGGER.info("热键已更新：%s (支持按住说话)", new_config.hotkey)
+                LOGGER.info("热键已更新:%s (支持按住说话)", new_config.hotkey)
             except Exception:
                 LOGGER.exception("注册新热键 %s 失败", new_config.hotkey)
 
@@ -577,14 +593,14 @@ class AssistantApp:
         return "未连接"
 
     def _exit(self) -> None:
-        """托盘菜单触发退出：停止托盘主循环，交由 finally 清理资源。"""
-        LOGGER.info("收到退出请求，正在关闭托盘 ...")
+        """托盘菜单触发退出:停止托盘主循环,交由 finally 清理资源。"""
+        LOGGER.info("收到退出请求,正在关闭托盘 ...")
         if self._tray:
             self._tray.stop()
 
     def _signal_handler(self, signum: int, frame: object) -> None:
-        """信号处理：优雅退出。"""
-        LOGGER.info("收到信号 %d，正在退出 ...", signum)
+        """信号处理:优雅退出。"""
+        LOGGER.info("收到信号 %d,正在退出 ...", signum)
         self._exit()
 
     # ------------------------------------------------------------------

@@ -49,6 +49,7 @@ class TrayManager:
         on_toggle_floating: Callable[[], None] | None = None,
         on_clear_conversation: Callable[[], None] | None = None,
         on_restart_session: Callable[[], None] | None = None,
+        on_toggle_silent_mode: Callable[[], None] | None = None,
     ) -> None:
         self._on_settings = on_settings
         self._on_exit = on_exit
@@ -57,6 +58,7 @@ class TrayManager:
         self._on_toggle_floating = on_toggle_floating
         self._on_clear_conversation = on_clear_conversation
         self._on_restart_session = on_restart_session
+        self._on_toggle_silent_mode = on_toggle_silent_mode
         self._icon: pystray.Icon | None = None
         self._current_status = "disconnected"
 
@@ -74,6 +76,8 @@ class TrayManager:
         # 添加快速操作（如果回调存在）
         if self._on_toggle_mute:
             menu_items.append(pystray.MenuItem("切换静音", self._on_toggle_mute_click))
+        if self._on_toggle_silent_mode:
+            menu_items.append(pystray.MenuItem("切换静默模式", self._on_toggle_silent_mode_click))
         if self._on_toggle_floating:
             menu_items.append(pystray.MenuItem("显示/隐藏悬浮窗", self._on_toggle_floating_click))
         if self._on_clear_conversation:
@@ -146,6 +150,13 @@ class TrayManager:
                 self._on_restart_session()
         except Exception:
             LOGGER.exception("重启Gemini会话失败")
+    
+    def _on_toggle_silent_mode_click(self, icon: pystray.Icon, item: pystray.MenuItem) -> None:
+        try:
+            if self._on_toggle_silent_mode:
+                self._on_toggle_silent_mode()
+        except Exception:
+            LOGGER.exception("切换静默模式失败")
     
     def _on_exit_click(self, icon: pystray.Icon, item: pystray.MenuItem) -> None:
         try:
