@@ -107,8 +107,7 @@ class PCController:
             shell=False,
         )
         if result.returncode != 0:
-            raise RuntimeError(result.stderr.strip() or result.stdout.strip() or "关闭应用失败")
-
+            return {"ok": False, "error": result.stderr.strip() or result.stdout.strip() or "关闭应用失败", "action": "close_app", "name": name}
         return {"ok": True, "action": "close_app", "name": name, "target": image_name}
 
     def screenshot(self) -> dict[str, Any]:
@@ -297,7 +296,7 @@ class PCController:
             import psutil
             cpu_percent = psutil.cpu_percent(interval=0.5)
             mem = psutil.virtual_memory()
-            disk = psutil.disk_usage("C:\\\\")
+            disk = psutil.disk_usage("/")
             return {
                 "ok": True,
                 "action": "get_system_info",
