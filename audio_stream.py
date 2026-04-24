@@ -90,6 +90,11 @@ class AudioStreamManager:
                 input_device_index=self.input_device_index,
                 frames_per_buffer=self.input_frames,
             )
+        except Exception:
+            LOGGER.exception("初始化输入音频流失败")
+            self._running.clear()
+            raise
+        try:
             self._output_stream = self._audio.open(
                 format=pyaudio.paInt16,
                 channels=1,
@@ -100,7 +105,11 @@ class AudioStreamManager:
                 stream_callback=self._output_callback,
             )
         except Exception:
-            LOGGER.exception("初始化音频流失败")
+            LOGGER.exception("初始化输出音频流失败")
+            if self._input_stream is not None:
+                self._input_stream.stop_stream()
+                self._input_stream.close()
+                self._input_stream = None
             self._running.clear()
             raise
 
