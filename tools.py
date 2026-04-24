@@ -16,91 +16,73 @@ class ToolRegistry:
     def __init__(self, config: AppConfig) -> None:
         self._controller = PCController(config.screenshot_dir)
         self._declarations = self._build_declarations()
+        self._handlers = self._build_handlers()
 
     def get_tools(self) -> list[types.Tool]:
         return [types.Tool(function_declarations=self._declarations)]
 
-    def execute(self, name: str, args: dict[str, Any] | None) -> dict[str, Any]:
-        payload = args or {}
-        LOGGER.info("执行工具调用：%s %s", name, payload)
-
-        handlers = {
-            "mouse_click": lambda: self._controller.mouse_click(
-                x=payload["x"],
-                y=payload["y"],
-                button=payload.get("button", "left"),
-            ),
-            "double_click": lambda: self._controller.double_click(
-                x=payload["x"],
-                y=payload["y"],
-            ),
-            "right_click": lambda: self._controller.right_click(
-                x=payload["x"],
-                y=payload["y"],
-            ),
-            "mouse_move": lambda: self._controller.mouse_move(x=payload["x"], y=payload["y"]),
-            "mouse_scroll": lambda: self._controller.mouse_scroll(
-                clicks=payload["clicks"],
-                x=payload.get("x"),
-                y=payload.get("y"),
-            ),
-            "type_text": lambda: self._controller.type_text(text=payload["text"]),
-            "press_key": lambda: self._controller.press_key(key=payload["key"]),
-            "hotkey": lambda: self._controller.hotkey(*payload.get("keys", [])),
-            "open_app": lambda: self._controller.open_app(name=payload["name"]),
-            "close_app": lambda: self._controller.close_app(name=payload["name"]),
-            "screenshot": self._controller.screenshot,
-            "get_screen_info": self._controller.get_screen_info,
-            "get_clipboard": self._controller.get_clipboard,
-            "set_clipboard": lambda: self._controller.set_clipboard(text=payload["text"]),
-            "get_mouse_position": self._controller.get_mouse_position,
-            "list_audio_devices": self._controller.list_audio_devices,
-            "window_minimize": lambda: self._controller.window_minimize(title=payload["title"]),
-            "window_maximize": lambda: self._controller.window_maximize(title=payload["title"]),
-            "window_restore": lambda: self._controller.window_restore(title=payload["title"]),
-            "get_volume": self._controller.get_volume,
-            "set_volume": lambda: self._controller.set_volume(level=payload["level"]),
-            "drag": lambda: self._controller.drag(
-                x1=payload["x1"], y1=payload["y1"],
-                x2=payload["x2"], y2=payload["y2"],
-                duration=payload.get("duration", 0.5),
-            ),
-            "wait_and_click": lambda: self._controller.wait_and_click(
-                x=payload["x"], y=payload["y"],
-                timeout=payload.get("timeout", 5.0),
-            ),
-            "get_active_window": self._controller.get_active_window,
-            "list_windows": self._controller.list_windows,
-            "get_pixel_color": lambda: self._controller.get_pixel_color(x=payload["x"], y=payload["y"]),
-            "focus_window": lambda: self._controller.focus_window(title=payload["title"]),
-            "open_url": lambda: self._controller.open_url(url=payload["url"]),
-            "kill_process": lambda: self._controller.kill_process(name=payload["name"]),
-            "list_processes": self._controller.list_processes,
-            "get_system_info": self._controller.get_system_info,
-            "run_command": lambda: self._controller.run_command(command=payload["command"], timeout=payload.get("timeout", 10)),
-            "get_time": self._controller.get_time,
-            "search_web": lambda: self._controller.search_web(query=payload["query"]),
-            "select_all": self._controller.select_all,
-            "undo": self._controller.undo,
-            "redo": self._controller.redo,
-            "copy_selection": self._controller.copy_selection,
-            "paste_from_clipboard": self._controller.paste_from_clipboard,
-            "save_file": self._controller.save_file,
-            "close_tab": self._controller.close_tab,
-            "new_tab": self._controller.new_tab,
-            "switch_window": self._controller.switch_window,
-            "lock_screen": self._controller.lock_screen,
-            "read_file": lambda: self._controller.read_file(path=payload["path"]),
-            "write_file": lambda: self._controller.write_file(path=payload["path"], content=payload["content"]),
-            "list_directory": lambda: self._controller.list_directory(path=payload.get("path", ".")),
-            "type_keys": lambda: self._controller.type_keys(keys=payload["keys"]),
+    def _build_handlers(self) -> dict[str, Any]:
+        c = self._controller
+        return {
+            "mouse_click": lambda: c.mouse_click(x=self._payload["x"], y=self._payload["y"], button=self._payload.get("button", "left")),
+            "double_click": lambda: c.double_click(x=self._payload["x"], y=self._payload["y"]),
+            "right_click": lambda: c.right_click(x=self._payload["x"], y=self._payload["y"]),
+            "mouse_move": lambda: c.mouse_move(x=self._payload["x"], y=self._payload["y"]),
+            "mouse_scroll": lambda: c.mouse_scroll(clicks=self._payload["clicks"], x=self._payload.get("x"), y=self._payload.get("y")),
+            "type_text": lambda: c.type_text(text=self._payload["text"]),
+            "press_key": lambda: c.press_key(key=self._payload["key"]),
+            "hotkey": lambda: c.hotkey(*self._payload.get("keys", [])),
+            "open_app": lambda: c.open_app(name=self._payload["name"]),
+            "close_app": lambda: c.close_app(name=self._payload["name"]),
+            "screenshot": c.screenshot,
+            "get_screen_info": c.get_screen_info,
+            "get_clipboard": c.get_clipboard,
+            "set_clipboard": lambda: c.set_clipboard(text=self._payload["text"]),
+            "get_mouse_position": c.get_mouse_position,
+            "list_audio_devices": c.list_audio_devices,
+            "window_minimize": lambda: c.window_minimize(title=self._payload["title"]),
+            "window_maximize": lambda: c.window_maximize(title=self._payload["title"]),
+            "window_restore": lambda: c.window_restore(title=self._payload["title"]),
+            "get_volume": c.get_volume,
+            "set_volume": lambda: c.set_volume(level=self._payload["level"]),
+            "drag": lambda: c.drag(x1=self._payload["x1"], y1=self._payload["y1"], x2=self._payload["x2"], y2=self._payload["y2"], duration=self._payload.get("duration", 0.5)),
+            "wait_and_click": lambda: c.wait_and_click(x=self._payload["x"], y=self._payload["y"], timeout=self._payload.get("timeout", 5.0)),
+            "get_active_window": c.get_active_window,
+            "list_windows": c.list_windows,
+            "get_pixel_color": lambda: c.get_pixel_color(x=self._payload["x"], y=self._payload["y"]),
+            "focus_window": lambda: c.focus_window(title=self._payload["title"]),
+            "open_url": lambda: c.open_url(url=self._payload["url"]),
+            "kill_process": lambda: c.kill_process(name=self._payload["name"]),
+            "list_processes": c.list_processes,
+            "get_system_info": c.get_system_info,
+            "run_command": lambda: c.run_command(command=self._payload["command"], timeout=self._payload.get("timeout", 10)),
+            "get_time": c.get_time,
+            "search_web": lambda: c.search_web(query=self._payload["query"]),
+            "select_all": c.select_all,
+            "undo": c.undo,
+            "redo": c.redo,
+            "copy_selection": c.copy_selection,
+            "paste_from_clipboard": c.paste_from_clipboard,
+            "save_file": c.save_file,
+            "close_tab": c.close_tab,
+            "new_tab": c.new_tab,
+            "switch_window": c.switch_window,
+            "lock_screen": c.lock_screen,
+            "read_file": lambda: c.read_file(path=self._payload["path"]),
+            "write_file": lambda: c.write_file(path=self._payload["path"], content=self._payload["content"]),
+            "list_directory": lambda: c.list_directory(path=self._payload.get("path", ".")),
+            "type_keys": lambda: c.type_keys(keys=self._payload["keys"]),
         }
 
-        if name not in handlers:
+    def execute(self, name: str, args: dict[str, Any] | None) -> dict[str, Any]:
+        self._payload = args or {}
+        LOGGER.info("执行工具调用：%s %s", name, self._payload)
+
+        if name not in self._handlers:
             raise ValueError(f"未知工具：{name}")
 
         try:
-            return handlers[name]()
+            return self._handlers[name]()
         except KeyError as exc:
             raise ValueError(f"工具 {name} 缺少必要参数: {exc}") from exc
 
