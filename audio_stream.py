@@ -229,7 +229,7 @@ class AudioStreamManager:
             if buffered:
                 data = bytes(self._output_buffer) + (b"\x00" * (requested_bytes - buffered))
                 self._output_buffer.clear()
-                self._output_primed = False
+                # Don't reset _output_primed here - we're still playing
             else:
                 data = silence
 
