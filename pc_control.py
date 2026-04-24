@@ -315,7 +315,20 @@ class PCController:
                     if length > 0:
                         buf = ctypes.create_unicode_buffer(length + 1)
                         user32.GetWindowTextW(hwnd, buf, length + 1)
-                        windows.append({"hwnd": hwnd, "title": buf.value})
+                        # 获取窗口状态
+                        placement = wintypes.WINDOWPLACEMENT()
+                        placement.length = ctypes.sizeof(placement)
+                        user32.GetWindowPlacement(hwnd, ctypes.byref(placement))
+                        state = "normal"
+                        if placement.showCmd == 2: # SW_SHOWMINIMIZED
+                            state = "minimized"
+                        elif placement.showCmd == 3: # SW_SHOWMAXIMIZED
+                            state = "maximized"
+                        windows.append({
+                            "hwnd": hwnd, 
+                            "title": buf.value,
+                            "state": state
+                        })
                 return True
             WNDENUMPROC = ctypes.WINFUNCTYPE(ctypes.c_bool, wintypes.HWND, wintypes.LPARAM)
             user32.EnumWindows(WNDENUMPROC(_enum_callback), 0)
