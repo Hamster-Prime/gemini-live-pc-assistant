@@ -302,8 +302,8 @@ class AssistantApp:
 
         if decision.speech_ended:
             LOGGER.debug("语音活动结束")
-            # 非手动模式下,语音结束自动发送结束标记,触发Gemini回复
-            if not self._manual_mode and self._gemini_session and self._gemini_session.is_connected():
+            # 语音结束自动发送结束标记,触发Gemini回复
+            if self._gemini_session and self._gemini_session.is_connected():
                 self._gemini_session.send_activity_end()
                 self._gemini_session.send_audio_stream_end()
                 with self._lock:
