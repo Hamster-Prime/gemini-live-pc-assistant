@@ -183,13 +183,19 @@ class PCController:
 
     def get_clipboard(self) -> dict[str, Any]:
         """获取剪贴板内容。"""
-        text = pyperclip.paste()
-        return {"ok": True, "action": "get_clipboard", "text": text}
+        try:
+            text = pyperclip.paste()
+            return {"ok": True, "action": "get_clipboard", "text": text}
+        except Exception as exc:
+            return {"ok": False, "error": str(exc)}
 
     def set_clipboard(self, text: str) -> dict[str, Any]:
         """设置剪贴板内容。"""
-        pyperclip.copy(text)
-        return {"ok": True, "action": "set_clipboard", "text": text}
+        try:
+            pyperclip.copy(text)
+            return {"ok": True, "action": "set_clipboard", "text": text}
+        except Exception as exc:
+            return {"ok": False, "error": str(exc)}
 
     def get_mouse_position(self) -> dict[str, Any]:
         """获取当前鼠标位置。"""
@@ -234,14 +240,17 @@ class PCController:
 
     def get_active_window(self) -> dict[str, Any]:
         """获取当前活动窗口信息。"""
-        import ctypes
-        user32 = ctypes.windll.user32
-        hwnd = user32.GetForegroundWindow()
-        length = user32.GetWindowTextLengthW(hwnd)
-        buf = ctypes.create_unicode_buffer(length + 1)
-        user32.GetWindowTextW(hwnd, buf, length + 1)
-        title = buf.value
-        return {"ok": True, "action": "get_active_window", "title": title, "hwnd": hwnd}
+        try:
+            import ctypes
+            user32 = ctypes.windll.user32
+            hwnd = user32.GetForegroundWindow()
+            length = user32.GetWindowTextLengthW(hwnd)
+            buf = ctypes.create_unicode_buffer(length + 1)
+            user32.GetWindowTextW(hwnd, buf, length + 1)
+            title = buf.value
+            return {"ok": True, "action": "get_active_window", "title": title, "hwnd": hwnd}
+        except Exception as exc:
+            return {"ok": False, "error": str(exc)}
 
     def list_windows(self) -> dict[str, Any]:
         """列出所有可见窗口。"""
