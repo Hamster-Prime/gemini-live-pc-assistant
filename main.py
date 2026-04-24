@@ -220,6 +220,13 @@ class AssistantApp:
             LOGGER.info("已注册静音热键：ctrl+m")
         except Exception:
             LOGGER.exception("注册静音热键失败")
+            
+        # Register open main window hotkey (Ctrl+O)
+        try:
+            keyboard.add_hotkey("ctrl+o", self._show_main_window, suppress=False)
+            LOGGER.info("已注册打开主窗口热键：ctrl+o")
+        except Exception:
+            LOGGER.exception("注册打开主窗口热键失败")
 
     # ------------------------------------------------------------------
     # 配置访问（供回调使用）
