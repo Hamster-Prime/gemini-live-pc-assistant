@@ -93,6 +93,27 @@ class MainWindow:
         from datetime import datetime
         timestamp = datetime.now().strftime("%H:%M:%S")
         self._append_text(self._assistant_text, f"[{timestamp}] {text}")
+    
+    def _clear_conversations(self) -> None:
+        """清空对话历史"""
+        if self._root is None:
+            return
+        
+        def clear():
+            try:
+                # 清空用户和助手对话
+                if self._user_text:
+                    self._user_text.config(state=tk.NORMAL)
+                    self._user_text.delete(1.0, tk.END)
+                    self._user_text.config(state=tk.DISABLED)
+                if self._assistant_text:
+                    self._assistant_text.config(state=tk.NORMAL)
+                    self._assistant_text.delete(1.0, tk.END)
+                    self._assistant_text.config(state=tk.DISABLED)
+            except tk.TclError:
+                pass
+        
+        self._root.after(0, clear)
 
     def set_listening(self, listening: bool) -> None:
         if self._root is None or self._toggle_button is None:
@@ -559,3 +580,30 @@ class FloatingStatusWindow:
             label.config(text=text, fg=fg)
         except tk.TclError:
             pass
+    
+    def hide(self) -> None:
+        if self._root is not None:
+            try:
+                self._root.after(0, lambda: self._root.withdraw())
+            except Exception:
+                pass
+    
+    def show(self) -> None:
+        if self._root is not None:
+            try:
+                self._root.after(0, lambda: self._root.deiconify())
+            except Exception:
+                pass
+    
+    def toggle_visibility(self) -> None:
+        if self._root is not None:
+            try:
+                if self._root.state() == "withdrawn":
+                    self.show()
+                else:
+                    self.hide()
+            except Exception:
+                pass
+    
+    def hide(self) -> None:
+        

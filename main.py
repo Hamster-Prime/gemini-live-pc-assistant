@@ -159,6 +159,10 @@ class AssistantApp:
             on_settings=self._show_main_window,
             on_exit=self._exit,
             status_getter=self._get_status_text,
+            on_toggle_mute=self.toggle_mute,
+            on_toggle_floating=self.toggle_floating_window,
+            on_clear_conversation=self.clear_conversation,
+            on_restart_session=self.restart_gemini_session,
         )
 
         try:
@@ -459,6 +463,32 @@ class AssistantApp:
 
     def is_muted(self) -> bool:
         return self._muted
+    
+    def toggle_floating_window(self) -> None:
+        """切换悬浮窗显示/隐藏"""
+        if self._floating_status:
+            self._floating_status.toggle_visibility()
+            LOGGER.info("已切换悬浮窗显示状态")
+    
+    def clear_conversation(self) -> None:
+        """清空主窗口对话历史"""
+        if self._main_window:
+            self._main_window._clear_conversations()
+            LOGGER.info("已清空对话历史")
+            if self._floating_status:
+                self._floating_status.set_status_text("对话历史已清空")
+            if self._main_window:
+                self._main_window.set_status_text("对话历史已清空")
+    
+    def restart_gemini_session(self) -> None:
+        """重启Gemini会话"""
+        if self._gemini_session:
+            self._gemini_session.restart()
+            LOGGER.info("已重启Gemini会话")
+            if self._floating_status:
+                self._floating_status.set_status_text("正在重启Gemini会话...")
+            if self._main_window:
+                self._main_window.set_status_text("正在重启Gemini会话...")
 
     def _on_settings_saved(self, new_config: AppConfig) -> None:
         old_config = self._config
