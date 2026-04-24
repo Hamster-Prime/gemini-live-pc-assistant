@@ -50,6 +50,7 @@ class GeminiLiveSession:
         self._thread: threading.Thread | None = None
         self._session: Any = None
         self._sender_queue: asyncio.Queue[dict[str, Any]] | None = None
+        self._session_handle: str | None = None
 
     def start(self) -> None:
         if self._thread and self._thread.is_alive():
@@ -72,6 +73,7 @@ class GeminiLiveSession:
             self._thread.join(timeout=5)
 
     def restart(self) -> None:
+        self._session_handle = None
         if self._loop is None:
             return
         asyncio.run_coroutine_threadsafe(self._close_current_session(), self._loop)
@@ -125,6 +127,12 @@ class GeminiLiveSession:
         client = genai.Client(api_key=api_key)
         tool_registry = self._tool_registry_getter()
         live_config = self._build_live_config(config, tool_registry)
+        if self._session_handle:
+            live_config["session_resumption"] = types.SessionResumptionConfig(
+                handle=self._session_handle,
+                transparent=True,
+            )
+            LOGGER.info("使用 session handle 进行会话恢复")
 
         async with client.aio.live.connect(model=config.model, config=live_config) as session:
             self._session = session
@@ -237,6 +245,15 @@ class GeminiLiveSession:
             if time_left is not None:
                 self._notify_status(f"服务端提示会话即将结束，剩余 {time_left} 秒，准备重连。")
             asyncio.get_running_loop().call_later(max(1.0, float(time_left or 2)), self._trigger_reconnect)
+
+        # Session resumption: 保存新的 session handle
+        resumption = getattr(response, "session_resumption_update", None)
+        if resumption is not None:
+            new_handle = getattr(resumption, "new_handle", None)
+            resumable = getattr(resumption, "resumable", False)
+            if new_handle:
+                self._session_handle = new_handle
+                LOGGER.info("收到 session resumption handle (resumable=%s)", resumable)
 
     async def _handle_tool_call(self, session: Any, tool_call: Any) -> None:
         function_calls = getattr(tool_call, "function_calls", None) or []
