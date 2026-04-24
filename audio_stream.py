@@ -157,10 +157,12 @@ class AudioStreamManager:
         return self._output_active
 
     def _input_loop(self) -> None:
+        consecutive_errors = 0
         while self._running.is_set():
             try:
                 assert self._input_stream is not None
                 data = self._input_stream.read(self.input_frames, exception_on_overflow=False)
+                consecutive_errors = 0
                 if self.input_device_rate != self.input_rate:
                     data = resample_pcm16(data, self.input_device_rate, self.input_rate)
 
@@ -170,7 +172,12 @@ class AudioStreamManager:
                     except Exception:
                         LOGGER.exception("处理麦克风音频时发生异常")
             except OSError:
-                LOGGER.exception("读取麦克风失败")
+                consecutive_errors += 1
+                LOGGER.exception("读取麦克风失败 (连续 %d 次)", consecutive_errors)
+                if consecutive_errors >= 5:
+                    LOGGER.error("麦克风连续失败 %d 次，停止输入循环", consecutive_errors)
+                    break
+                time.sleep(min(0.1 * consecutive_errors, 1.0))
 
     def _output_callback(
         self,

@@ -122,7 +122,8 @@ class GeminiLiveSession:
     async def _connect_once(self, config: AppConfig, api_key: str) -> None:
         self._notify_status("正在连接 Gemini Live API...")
         client = genai.Client(api_key=api_key)
-        live_config = self._build_live_config(config)
+        tool_registry = self._tool_registry_getter()
+        live_config = self._build_live_config(config, tool_registry)
 
         async with client.aio.live.connect(model=config.model, config=live_config) as session:
             self._session = session
@@ -275,7 +276,7 @@ class GeminiLiveSession:
             LOGGER.debug("关闭 Live 会话时异常", exc_info=True)
 
     @staticmethod
-    def _build_live_config(config: AppConfig) -> dict[str, Any]:
+    def _build_live_config(config: AppConfig, tool_registry: ToolRegistry) -> dict[str, Any]:
         system_text = (
             "你是一个 Windows 电脑语音助手。用户会通过中文语音让你操控电脑。"
             "请优先使用工具执行鼠标、键盘与应用控制。"
@@ -285,7 +286,7 @@ class GeminiLiveSession:
         return {
             "response_modalities": ["AUDIO"],
             "system_instruction": types.Content(parts=[types.Part(text=system_text)]),
-            "tools": ToolRegistry(config).get_tools(),
+            "tools": tool_registry.get_tools(),
             "input_audio_transcription": {},
             "output_audio_transcription": {},
             "realtime_input_config": {

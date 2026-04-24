@@ -48,7 +48,10 @@ class ToolRegistry:
         if name not in handlers:
             raise ValueError(f"未知工具：{name}")
 
-        return handlers[name]()
+        try:
+            return handlers[name]()
+        except KeyError as exc:
+            raise ValueError(f"工具 {name} 缺少必要参数: {exc}") from exc
 
     @staticmethod
     def _build_declarations() -> list[types.FunctionDeclaration]:

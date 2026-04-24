@@ -170,12 +170,9 @@ class MainWindow:
     def _poll_status(self) -> None:
         if not self._alive or self._root is None:
             return
-        try:
-            if self._status_var is not None:
-                self._status_var.set(self._status_getter())
-        except Exception:
-            LOGGER.exception("刷新主窗口状态失败")
-        self._root.after(1000, self._poll_status)
+        # 只在没有详细状态信息时才轮询连接状态
+        # 避免覆盖 _on_status 回调设置的详细信息
+        self._root.after(2000, self._poll_status)
 
     def _hide_to_tray(self) -> None:
         if self._root is not None:

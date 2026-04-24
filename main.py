@@ -172,15 +172,17 @@ class AssistantApp:
 
         if decision.speech_ended:
             LOGGER.debug("语音活动结束")
-            if self._manual_mode:
-                self._finish_manual_listen()
 
-        if not decision.speech_active:
-            return
-
-        # 将音频发送到 Gemini
-        if self._gemini_session and self._gemini_session.is_connected():
-            self._gemini_session.send_audio(chunk)
+        # 发送 pre-roll 音频（语音开始前的缓冲数据）
+        if decision.speech_started and decision.emit_chunks:
+            if self._gemini_session and self._gemini_session.is_connected():
+                for pre_chunk in decision.emit_chunks:
+                    self._gemini_session.send_audio(pre_chunk)
+            # pre-roll 已包含当前 chunk，跳过下面的重复发送
+        elif decision.speech_active:
+            # 将音频发送到 Gemini
+            if self._gemini_session and self._gemini_session.is_connected():
+                self._gemini_session.send_audio(chunk)
 
     def _on_playback_idle(self) -> None:
         """播放结束回调。"""

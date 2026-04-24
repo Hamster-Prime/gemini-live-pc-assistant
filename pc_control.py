@@ -37,12 +37,18 @@ class PCController:
 
     def mouse_click(self, x: int, y: int, button: str = "left") -> dict[str, Any]:
         self._validate_button(button)
-        pyautogui.click(x=int(x), y=int(y), button=button)
-        return {"ok": True, "action": "mouse_click", "x": int(x), "y": int(y), "button": button}
+        width, height = pyautogui.size()
+        x = max(0, min(int(x), width - 1))
+        y = max(0, min(int(y), height - 1))
+        pyautogui.click(x=x, y=y, button=button)
+        return {"ok": True, "action": "mouse_click", "x": x, "y": y, "button": button}
 
     def mouse_move(self, x: int, y: int) -> dict[str, Any]:
-        pyautogui.moveTo(int(x), int(y), duration=0.08)
-        return {"ok": True, "action": "mouse_move", "x": int(x), "y": int(y)}
+        width, height = pyautogui.size()
+        x = max(0, min(int(x), width - 1))
+        y = max(0, min(int(y), height - 1))
+        pyautogui.moveTo(x, y, duration=0.08)
+        return {"ok": True, "action": "mouse_move", "x": x, "y": y}
 
     def mouse_scroll(self, clicks: int, x: int | None = None, y: int | None = None) -> dict[str, Any]:
         if x is not None and y is not None:
@@ -70,7 +76,7 @@ class PCController:
         if hasattr(os, "startfile") and Path(target).exists():
             os.startfile(target)  # type: ignore[attr-defined]
         else:
-            subprocess.Popen(f'start "" "{target}"', shell=True)
+            subprocess.Popen(["cmd", "/c", "start", "", target])
         return {"ok": True, "action": "open_app", "name": name, "target": target}
 
     def close_app(self, name: str) -> dict[str, Any]:
