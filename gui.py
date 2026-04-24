@@ -57,7 +57,9 @@ class MainWindow:
         self._assistant_text: tk.Text | None = None
         self._toggle_button: ttk.Button | None = None
         self._mute_button: ttk.Button | None = None
+        self._export_button: ttk.Button | None = None
         self._alive = False
+        self._conversation_history = []  # 存储对话历史，每条包含role, content, timestamp
 
     def start(self) -> None:
         if self._alive:
@@ -87,12 +89,26 @@ class MainWindow:
     def set_user_text(self, text: str) -> None:
         from datetime import datetime
         timestamp = datetime.now().strftime("%H:%M:%S")
-        self._append_text(self._user_text, f"[{timestamp}] {text}")
+        full_text = f"[{timestamp}] {text}"
+        self._append_text(self._user_text, full_text)
+        # 保存到对话历史
+        self._conversation_history.append({
+            "role": "user",
+            "content": text,
+            "timestamp": timestamp
+        })
 
     def set_assistant_text(self, text: str) -> None:
         from datetime import datetime
         timestamp = datetime.now().strftime("%H:%M:%S")
-        self._append_text(self._assistant_text, f"[{timestamp}] {text}")
+        full_text = f"[{timestamp}] {text}"
+        self._append_text(self._assistant_text, full_text)
+        # 保存到对话历史
+        self._conversation_history.append({
+            "role": "assistant",
+            "content": text,
+            "timestamp": timestamp
+        })
     
     def _clear_conversations(self) -> None:
         """清空对话历史"""
@@ -124,6 +140,50 @@ class MainWindow:
             status_parts.append("【静默模式】")
         status_text = "    ".join(status_parts)
         self._root.after(0, lambda: self._status_var.set(status_text))
+    
+    def _export_conversation(self) -> None:
+        """导出对话历史为Markdown文件"""
+        if not self._conversation_history:
+            if self._root:
+                tk.messagebox.showinfo("提示", "没有对话历史可以导出")
+            return
+        
+        try:
+            from datetime import datetime
+            from tkinter import filedialog
+            
+            # 生成默认文件名
+            default_name = f"对话历史_{datetime.now().strftime('%Y%m%d_%H%M%S')}.md"
+            
+            # 弹出保存对话框
+            file_path = filedialog.asksaveasfilename(
+                defaultextension=".md",
+                filetypes=[("Markdown 文件", "*.md"), ("文本文件", "*.txt"), ("所有文件", "*.*")],
+                initialfile=default_name,
+                title="导出对话历史"
+            )
+            
+            if not file_path:
+                return  # 用户取消
+            
+            # 生成Markdown内容
+            content = f"# Gemini 对话历史\n\n导出时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n---\n\n"
+            for msg in self._conversation_history:
+                role = "🙋 用户" if msg["role"] == "user" else "🤖 助手"
+                content += f"## {role} ({msg['timestamp']})\n\n{msg['content']}\n\n---\n\n"
+            
+            # 保存文件
+            with open(file_path, "w", encoding="utf-8") as f:
+                f.write(content)
+            
+            # 提示成功
+            if self._root:
+                tk.messagebox.showinfo("导出成功", f"对话历史已保存到:\n{file_path}")
+                
+        except Exception as exc:
+            LOGGER.exception("导出对话历史失败")
+            if self._root:
+                tk.messagebox.showerror("导出失败", f"导出对话历史失败: {str(exc)}")
 
     def set_listening(self, listening: bool) -> None:
         if self._root is None or self._toggle_button is None:
@@ -138,7 +198,7 @@ class MainWindow:
         self._root.after(0, lambda: self._mute_button.configure(text=label))
 
     def _clear_conversations(self) -> None:
-        """清空对话历史显示。"""
+        """清空对话历史显示和内存记录。"""
         for widget in (self._user_text, self._assistant_text):
             if widget is not None:
                 try:
@@ -147,6 +207,8 @@ class MainWindow:
                     widget.configure(state=tk.DISABLED)
                 except tk.TclError:
                     pass
+        # 清空内存中的历史记录
+        self._conversation_history.clear()
 
     def _run(self) -> None:
         self._root = tk.Tk()
@@ -181,6 +243,7 @@ class MainWindow:
             self._mute_button = None
         ttk.Button(actions, text="设置", command=self._on_settings).pack(side=tk.LEFT, padx=8)
         ttk.Button(actions, text="清空对话", command=self._clear_conversations).pack(side=tk.LEFT, padx=4)
+        ttk.Button(actions, text="导出对话", command=self._export_conversation).pack(side=tk.LEFT, padx=4)
         ttk.Button(actions, text="隐藏到托盘", command=self._hide_to_tray).pack(side=tk.LEFT)
         ttk.Button(actions, text="退出", command=self._on_exit).pack(side=tk.RIGHT)
 
