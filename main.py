@@ -286,6 +286,8 @@ class AssistantApp:
             return
 
         if self._manual_mode:
+            # 手动模式下仍通过VAD更新音量指示器
+            self._wake_detector.process(chunk)
             if self._gemini_session and self._gemini_session.is_connected():
                 self._gemini_session.send_audio(chunk)
             return
