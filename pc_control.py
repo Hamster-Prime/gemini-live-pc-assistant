@@ -208,7 +208,7 @@ class PCController:
         x2 = max(0, min(int(x2), width - 1))
         y2 = max(0, min(int(y2), height - 1))
         pyautogui.moveTo(x1, y1)
-        pyautogui.drag(x2 - x1, y2 - y1, duration=duration)
+        pyautogui.dragTo(x2, y2, duration=duration, button="left")
         return {"ok": True, "action": "drag", "x1": x1, "y1": y1, "x2": x2, "y2": y2}
 
     def wait_and_click(self, x: int, y: int, timeout: float = 5.0) -> dict[str, Any]:
