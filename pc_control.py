@@ -212,16 +212,13 @@ class PCController:
         return {"ok": True, "action": "drag", "x1": x1, "y1": y1, "x2": x2, "y2": y2}
 
     def wait_and_click(self, x: int, y: int, timeout: float = 5.0) -> dict[str, Any]:
-        """等待指定坐标出现可点击元素后点击（简单等待+点击）。"""
-        import time as _time
+        """等待指定时间后点击坐标。"""
         width, height = pyautogui.size()
         x = max(0, min(int(x), width - 1))
         y = max(0, min(int(y), height - 1))
-        deadline = _time.monotonic() + timeout
-        while _time.monotonic() < deadline:
-            pyautogui.click(x=x, y=y)
-            _time.sleep(0.3)
-        return {"ok": True, "action": "wait_and_click", "x": x, "y": y, "timeout": timeout}
+        time.sleep(max(0.0, float(timeout)))
+        pyautogui.click(x=x, y=y)
+        return {"ok": True, "action": "wait_and_click", "x": x, "y": y, "waited": timeout}
 
     def get_active_window(self) -> dict[str, Any]:
         """获取当前活动窗口信息。"""

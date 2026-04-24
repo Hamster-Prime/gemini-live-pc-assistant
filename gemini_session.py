@@ -103,7 +103,7 @@ class GeminiLiveSession:
             api_key = config.resolved_api_key()
             if not api_key:
                 self._notify_status("尚未配置 Gemini API Key，请先在设置中填写。")
-                await asyncio.sleep(1.0)
+                await asyncio.sleep(5.0)
                 continue
 
             try:
