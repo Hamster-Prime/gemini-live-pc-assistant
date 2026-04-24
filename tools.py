@@ -14,7 +14,7 @@ LOGGER = logging.getLogger(__name__)
 
 class ToolRegistry:
     def __init__(self, config: AppConfig) -> None:
-        self._controller = PCController(config.screenshot_dir)
+        self._controller = PCController(config.screenshot_dir, config.max_screenshots)
         self._declarations = self._build_declarations()
         self._handlers = self._build_handlers()
 

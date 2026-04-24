@@ -303,6 +303,7 @@ class SettingsWindow:
             ("reconnect_initial_delay", "重连初始延迟 (秒)", False),
             ("reconnect_max_delay", "重连最大延迟 (秒)", False),
             ("screenshot_dir", "截图保存目录", False),
+            ("max_screenshots", "最大截图保留数量", False),
         ]
 
         for key, label, is_password in fields:
@@ -366,6 +367,7 @@ class SettingsWindow:
                         "chunk_ms": (10, 200),
                         "reconnect_initial_delay": (0.5, 60.0),
                         "reconnect_max_delay": (1.0, 300.0),
+                        "max_screenshots": (1, 200),
                     }
                     if key in range_limits:
                         min_val, max_val = range_limits[key]
