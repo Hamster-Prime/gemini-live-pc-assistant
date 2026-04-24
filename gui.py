@@ -184,6 +184,172 @@ class MainWindow:
             LOGGER.exception("导出对话历史失败")
             if self._root:
                 tk.messagebox.showerror("导出失败", f"导出对话历史失败: {str(exc)}")
+    
+    def _open_help_window(self) -> None:
+        """打开帮助窗口"""
+        if not hasattr(self, '_help_window') or not self._help_window.is_alive():
+            self._help_window = HelpWindow()
+            self._help_window.start()
+
+
+# ======================================================================
+# 帮助窗口
+# ======================================================================
+
+
+class HelpWindow:
+    """帮助窗口，显示快捷键和使用说明"""
+    
+    def __init__(self) -> None:
+        self._root: tk.Tk | None = None
+        self._thread: threading.Thread | None = None
+        self._alive = False
+    
+    def start(self) -> None:
+        if self._alive:
+            return
+        self._alive = True
+        self._thread = threading.Thread(target=self._run, daemon=True)
+        self._thread.start()
+    
+    def stop(self) -> None:
+        self._alive = False
+        if self._root:
+            try:
+                self._root.after(0, self._root.destroy)
+            except Exception:
+                pass
+    
+    def is_alive(self) -> bool:
+        return self._alive
+    
+    def _run(self) -> None:
+        self._root = tk.Tk()
+        self._root.title("Gemini Live PC Assistant - 帮助")
+        self._root.geometry("600x500")
+        self._root.resizable(False, False)
+        self._root.protocol("WM_DELETE_WINDOW", self._on_close)
+        
+        # 主框架
+        main_frame = ttk.Frame(self._root, padding=12)
+        main_frame.pack(fill=tk.BOTH, expand=True)
+        
+        # 标题
+        ttk.Label(main_frame, text="使用帮助", font=("", 14, "bold")).pack(pady=(0, 8))
+        
+        # 笔记本控件，分页显示不同内容
+        notebook = ttk.Notebook(main_frame)
+        notebook.pack(fill=tk.BOTH, expand=True, pady=8)
+        
+        # 快捷键页面
+        hotkey_frame = ttk.Frame(notebook, padding=8)
+        notebook.add(hotkey_frame, text="快捷键说明")
+        
+        hotkey_content = """
+⌨️  快捷键说明
+
+{hotkey}  按住说话/松开结束；短按切换手动聆听模式
+Ctrl + M  切换麦克风静音
+Ctrl + O  快速打开主窗口
+Ctrl + C  复制选中的对话文本
+Ctrl + A  全选当前面板的对话文本
+鼠标移到屏幕左上角  紧急中断助手自动化操作（PyAutoGUI安全机制）
+        """.format(hotkey=self._get_default_hotkey())
+        
+        hotkey_label = ttk.Label(hotkey_frame, text=hotkey_content, justify=tk.LEFT, wraplength=550)
+        hotkey_label.pack(anchor=tk.W)
+        
+        # 功能说明页面
+        feature_frame = ttk.Frame(notebook, padding=8)
+        notebook.add(feature_frame, text="功能介绍")
+        
+        feature_content = """
+✨  主要功能
+
+🎙️  语音对话
+- 支持实时语音输入，自动语音识别
+- 助手语音回复，支持静默模式（仅显示文字）
+- 按住说话功能：按住热键说话，松开自动结束
+
+🖥️  远程控制
+- 支持截图、打开应用、模拟键鼠操作等40+系统控制工具
+- 截图自动保存到本地，同时复制到剪贴板
+
+💬  对话管理
+- 对话历史永久保存，支持导出为Markdown文件
+- 对话文本支持选择复制，右键菜单操作
+
+⚙️  个性化设置
+- 自定义热键、语音参数、代理配置
+- 悬浮窗透明度自定义，窗口位置记忆
+- 开机自启动、静默模式等实用功能
+
+🔔  智能提示
+- 主窗口隐藏时新消息自动弹出系统通知
+- 连接状态、操作结果实时显示
+        """
+        
+        feature_label = ttk.Label(feature_frame, text=feature_content, justify=tk.LEFT, wraplength=550)
+        feature_label.pack(anchor=tk.W)
+        
+        # 使用技巧页面
+        tip_frame = ttk.Frame(notebook, padding=8)
+        notebook.add(tip_frame, text="使用技巧")
+        
+        tip_content = """
+💡  使用技巧
+
+1.  对于长文本或中文输入，使用按住说话功能比手动聆听更方便，说完松开就会自动处理
+2.  你可以直接要求助手「帮我打开计算器」、「截图保存」、「帮我写一份Python脚本」等，无需手动操作
+3.  悬浮窗双击可以快速打开主窗口，右键托盘图标有更多快捷操作
+4.  如果网络不好，可以在设置里配置代理，修改后会自动重启会话
+5.  重要的对话可以通过「导出对话」功能保存为Markdown文件永久留存
+6.  如果助手执行了误操作，立刻把鼠标移到屏幕左上角可以中断所有自动化操作
+7.  静默模式下助手不会播放语音，只会显示文字回复，适合公共场合使用
+        """
+        
+        tip_label = ttk.Label(tip_frame, text=tip_content, justify=tk.LEFT, wraplength=550)
+        tip_label.pack(anchor=tk.W)
+        
+        # 关于页面
+        about_frame = ttk.Frame(notebook, padding=8)
+        notebook.add(about_frame, text="关于")
+        
+        about_content = """
+ℹ️  关于本程序
+
+Gemini Live PC Assistant 是一款基于Google Gemini Live API的智能桌面助手
+支持实时语音交互、桌面控制、信息查询等功能，让你的电脑操作更高效
+
+GitHub 仓库：https://github.com/Hamster-Prime/gemini-live-pc-assistant
+
+本程序完全开源免费，欢迎Star、Fork、提交PR贡献代码
+        """
+        
+        about_label = ttk.Label(about_frame, text=about_content, justify=tk.LEFT, wraplength=550)
+        about_label.pack(anchor=tk.W)
+        
+        # 底部按钮
+        btn_frame = ttk.Frame(main_frame)
+        btn_frame.pack(fill=tk.X, pady=(8, 0))
+        ttk.Button(btn_frame, text="关闭", command=self._on_close).pack(side=tk.RIGHT)
+        
+        self._root.mainloop()
+    
+    @staticmethod
+    def _get_default_hotkey() -> str:
+        """获取默认热键提示"""
+        try:
+            from config import ConfigManager
+            config = ConfigManager().load()
+            return config.hotkey
+        except Exception:
+            return "Ctrl + Space"
+    
+    def _on_close(self) -> None:
+        self._alive = False
+        if self._root:
+            self._root.destroy()
 
     def set_listening(self, listening: bool) -> None:
         if self._root is None or self._toggle_button is None:
@@ -265,6 +431,7 @@ class MainWindow:
         ttk.Button(actions, text="设置", command=self._on_settings).pack(side=tk.LEFT, padx=8)
         ttk.Button(actions, text="清空对话", command=self._clear_conversations).pack(side=tk.LEFT, padx=4)
         ttk.Button(actions, text="导出对话", command=self._export_conversation).pack(side=tk.LEFT, padx=4)
+        ttk.Button(actions, text="帮助", command=self._open_help_window).pack(side=tk.LEFT, padx=4)
         ttk.Button(actions, text="隐藏到托盘", command=self._hide_to_tray).pack(side=tk.LEFT)
         ttk.Button(actions, text="退出", command=self._on_exit).pack(side=tk.RIGHT)
 
