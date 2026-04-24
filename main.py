@@ -501,8 +501,7 @@ class AssistantApp:
     def toggle_silent_mode(self) -> None:
         """切换静默模式"""
         new_mode = not self._config.silent_mode
-        self._config_manager.update(silent_mode=new_mode)
-        self._config.silent_mode = new_mode
+        self._config = self._config_manager.update(silent_mode=new_mode)
         status_text = "已开启静默模式，将仅显示文字回复" if new_mode else "已关闭静默模式，恢复语音回复"
         LOGGER.info(status_text)
         if self._floating_status:
