@@ -120,6 +120,7 @@ class AssistantApp:
         self._muted = False
         self._lock = threading.Lock()
         self._hold_to_talk = False
+        self._hotkey_release_callback = None
 
     # ------------------------------------------------------------------
     # 生命周期
@@ -224,6 +225,7 @@ class AssistantApp:
                         self._finish_manual_listen() # 松开结束
             
             keyboard.add_hotkey(hotkey, callback=on_hotkey_press, suppress=False, trigger_on_release=False)
+            self._hotkey_release_callback = on_hotkey_release
             keyboard.on_release_key(hotkey.split('+')[-1], callback=on_hotkey_release, suppress=False)
             LOGGER.info("已注册热键：%s (支持按住说话)", hotkey)
         except Exception:
@@ -490,11 +492,30 @@ class AssistantApp:
         if old_config.hotkey != new_config.hotkey:
             try:
                 keyboard.remove_hotkey(old_config.hotkey)
+                # 移除旧的松开事件回调
+                if self._hotkey_release_callback:
+                    keyboard.unhook(self._hotkey_release_callback)
+                    self._hotkey_release_callback = None
             except Exception:
                 pass
             try:
-                keyboard.add_hotkey(new_config.hotkey, self._on_hotkey_pressed, suppress=False)
-                LOGGER.info("热键已更新：%s", new_config.hotkey)
+                # 重新注册新热键（支持按住说话）
+                def on_hotkey_press(e):
+                    with self._lock:
+                        if not self._manual_mode:
+                            self._hold_to_talk = True
+                            self._on_hotkey_pressed() # 开始聆听
+                
+                def on_hotkey_release(e):
+                    with self._lock:
+                        if self._hold_to_talk and self._manual_mode:
+                            self._hold_to_talk = False
+                            self._finish_manual_listen() # 松开结束
+                
+                keyboard.add_hotkey(new_config.hotkey, callback=on_hotkey_press, suppress=False, trigger_on_release=False)
+                self._hotkey_release_callback = on_hotkey_release
+                keyboard.on_release_key(new_config.hotkey.split('+')[-1], callback=on_hotkey_release, suppress=False)
+                LOGGER.info("热键已更新：%s (支持按住说话)", new_config.hotkey)
             except Exception:
                 LOGGER.exception("注册新热键 %s 失败", new_config.hotkey)
 
