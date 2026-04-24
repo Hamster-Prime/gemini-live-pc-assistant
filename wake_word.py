@@ -54,7 +54,11 @@ class EnergyVadWakeDetector:
         self._pre_roll.append(chunk)
 
         if not self._in_speech and not raw_active:
-            self._noise_floor = (self._noise_floor * 0.95) + (energy * 0.05)
+            # 快速攻击（噪声升高时快速跟随），慢速释放（噪声降低时缓慢跟随）
+            if energy > self._noise_floor:
+                self._noise_floor = (self._noise_floor * 0.85) + (energy * 0.15)
+            else:
+                self._noise_floor = (self._noise_floor * 0.98) + (energy * 0.02)
 
         speech_started = False
         speech_ended = False
