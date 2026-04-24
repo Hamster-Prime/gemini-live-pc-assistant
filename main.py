@@ -262,6 +262,18 @@ class AssistantApp:
 
         if decision.speech_ended:
             LOGGER.debug("语音活动结束")
+            # 非手动模式下，语音结束自动发送结束标记，触发Gemini回复
+            if not self._manual_mode and self._gemini_session and self._gemini_session.is_connected():
+                self._gemini_session.send_activity_end()
+                self._gemini_session.send_audio_stream_end()
+                with self._lock:
+                    self._listening = False
+                # 更新UI状态
+                if self._floating_status:
+                    self._floating_status.set_state("idle")
+                if self._main_window:
+                    self._main_window.set_state("idle")
+                    self._main_window.set_listening(False)
 
         # 发送 pre-roll 音频（语音开始前的缓冲数据）
         if decision.speech_started and decision.emit_chunks:
