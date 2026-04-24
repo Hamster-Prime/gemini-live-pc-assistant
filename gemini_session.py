@@ -186,7 +186,12 @@ class GeminiLiveSession:
 
     async def _receiver_loop(self, session: Any) -> None:
         async for response in session.receive():
-            await self._handle_response(session, response)
+            try:
+                await self._handle_response(session, response)
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                LOGGER.exception("处理 Gemini 响应时异常")
 
     async def _handle_response(self, session: Any, response: Any) -> None:
         server_content = getattr(response, "server_content", None)
