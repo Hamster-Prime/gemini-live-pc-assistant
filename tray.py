@@ -64,7 +64,7 @@ class TrayManager:
 
     def run(self) -> None:
         """阻塞运行托盘图标。"""
-        def _status_text(icon: pystray.Icon, item: pystray.MenuItem) -> str:
+        def _status_text(item: pystray.MenuItem) -> str:
             return f"状态: {_STATUS_LABELS.get(self._current_status, self._current_status)}"
 
         # 构建菜单

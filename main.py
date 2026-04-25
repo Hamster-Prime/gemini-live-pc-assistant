@@ -231,17 +231,22 @@ class AssistantApp:
     def _register_hold_hotkey(self, hotkey: str) -> None:
         """Register a hold-to-talk hotkey."""
         try:
-            def on_hotkey_press(e):
+            def on_hotkey_press() -> None:
+                should_start = False
                 with self._lock:
                     if not self._manual_mode:
                         self._hold_to_talk = True
-                        self._on_hotkey_pressed()
+                        should_start = True
+                if should_start:
+                    self._start_manual_listen()
 
-            def on_hotkey_release(e):
+            def on_hotkey_release(e) -> None:
+                should_finish = False
                 with self._lock:
                     if self._hold_to_talk and self._manual_mode:
-                        self._hold_to_talk = False
-                        self._finish_manual_listen()
+                        should_finish = True
+                if should_finish:
+                    self._finish_manual_listen()
 
             keyboard.add_hotkey(hotkey, callback=on_hotkey_press, suppress=False, trigger_on_release=False)
             self._hotkey_release_callback = on_hotkey_release
@@ -374,6 +379,7 @@ class AssistantApp:
 
     def _finish_manual_listen(self) -> None:
         with self._lock:
+            self._hold_to_talk = False
             if not self._manual_mode:
                 return
             self._manual_mode = False

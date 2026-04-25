@@ -12,6 +12,7 @@ from typing import Any
 
 from google import genai
 from google.genai import types
+from websockets.exceptions import ConnectionClosed
 
 from config import AppConfig
 from tools import ToolRegistry
@@ -113,59 +114,57 @@ class GeminiLiveSession:
                 delay = config.reconnect_initial_delay
             except asyncio.CancelledError:
                 raise
+            except ConnectionClosed as exc:
+                LOGGER.warning("Gemini Live WebSocket 已关闭，准备重连：%s", exc)
+                self._mark_disconnected()
+                self._notify_status(f"Gemini 连接断开，{delay:.0f} 秒后重连：{exc}")
+                await asyncio.sleep(delay + random.uniform(0, delay * 0.3))
+                delay = min(delay * 2, config.reconnect_max_delay)
             except Exception as exc:
                 LOGGER.exception("Gemini Live 会话异常")
-                self._connected.clear()
-                self._session = None
-                self._notify_connection(False)
+                self._mark_disconnected()
                 self._notify_status(f"Gemini 连接断开，{delay:.0f} 秒后重连：{exc}")
                 await asyncio.sleep(delay + random.uniform(0, delay * 0.3))
                 delay = min(delay * 2, config.reconnect_max_delay)
 
     async def _connect_once(self, config: AppConfig, api_key: str) -> None:
         self._notify_status("正在连接 Gemini Live API...")
-        # 应用代理设置
-        proxies = {}
-        if config.http_proxy.strip():
-            proxies["http"] = config.http_proxy.strip()
-        if config.https_proxy.strip():
-            proxies["https"] = config.https_proxy.strip()
-        client = genai.Client(api_key=api_key, proxies=proxies if proxies else None)
+        client = genai.Client(
+            api_key=api_key,
+            http_options=self._build_http_options(config),
+        )
         tool_registry = self._tool_registry_getter()
-        live_config = self._build_live_config(config, tool_registry)
+        live_config = self._build_live_config(config, tool_registry, self._session_handle)
         if self._session_handle:
-            live_config["session_resumption"] = types.SessionResumptionConfig(
-                handle=self._session_handle,
-                transparent=True,
-            )
             LOGGER.info("使用 session handle 进行会话恢复")
 
-        async with client.aio.live.connect(model=config.model, config=live_config) as session:
-            self._session = session
-            self._sender_queue = asyncio.Queue(maxsize=512)
-            self._connected.set()
-            self._notify_connection(True)
-            self._notify_status("Gemini Live 已连接")
+        try:
+            async with client.aio.live.connect(model=config.model, config=live_config) as session:
+                self._session = session
+                self._sender_queue = asyncio.Queue(maxsize=512)
+                self._connected.set()
+                self._notify_connection(True)
+                self._notify_status("Gemini Live 已连接")
 
-            sender_task = asyncio.create_task(self._sender_loop(session))
-            receiver_task = asyncio.create_task(self._receiver_loop(session))
-            done, pending = await asyncio.wait(
-                {sender_task, receiver_task},
-                return_when=asyncio.FIRST_EXCEPTION,
-            )
+                sender_task = asyncio.create_task(self._sender_loop(session))
+                receiver_task = asyncio.create_task(self._receiver_loop(session))
+                done, pending = await asyncio.wait(
+                    {sender_task, receiver_task},
+                    return_when=asyncio.FIRST_EXCEPTION,
+                )
 
-            for task in pending:
-                task.cancel()
-            await asyncio.gather(*pending, return_exceptions=True)
+                for task in pending:
+                    task.cancel()
+                await asyncio.gather(*pending, return_exceptions=True)
 
-            for task in done:
-                exception = task.exception()
-                if exception is not None:
-                    raise exception
-
-        self._connected.clear()
-        self._session = None
-        self._notify_connection(False)
+                for task in done:
+                    exception = task.exception()
+                    if exception is not None:
+                        raise exception
+        finally:
+            self._discard_pending_messages()
+            self._sender_queue = None
+            self._mark_disconnected()
 
     async def _sender_loop(self, session: Any) -> None:
         assert self._sender_queue is not None
@@ -195,6 +194,11 @@ class GeminiLiveSession:
                     await session.send_tool_response(function_responses=message["responses"])
             except asyncio.CancelledError:
                 break
+            except ConnectionClosed as exc:
+                LOGGER.warning("Gemini Live WebSocket 已关闭，停止发送并准备重连：%s", exc)
+                self._mark_disconnected()
+                self._discard_pending_messages()
+                raise
             except Exception:
                 LOGGER.exception("发送消息到 Gemini 失败 (kind=%s)", kind)
 
@@ -323,8 +327,52 @@ class GeminiLiveSession:
         except Exception:
             LOGGER.debug("关闭 Live 会话时异常", exc_info=True)
 
+    def _mark_disconnected(self) -> None:
+        was_connected = self._connected.is_set()
+        self._connected.clear()
+        self._session = None
+        if was_connected:
+            self._notify_connection(False)
+
+    def _discard_pending_messages(self) -> None:
+        queue = self._sender_queue
+        if queue is None:
+            return
+        discarded = 0
+        while True:
+            try:
+                queue.get_nowait()
+                discarded += 1
+            except asyncio.QueueEmpty:
+                break
+        if discarded:
+            LOGGER.debug("已丢弃 %d 条断线期间待发送消息", discarded)
+
     @staticmethod
-    def _build_live_config(config: AppConfig, tool_registry: ToolRegistry) -> dict[str, Any]:
+    def _build_http_options(config: AppConfig) -> types.HttpOptions:
+        proxy = config.https_proxy.strip() or config.http_proxy.strip()
+
+        client_args = {"proxy": proxy} if proxy else None
+        async_client_args: dict[str, Any] = {
+            "open_timeout": 20,
+            "ping_interval": 20,
+            "ping_timeout": 60,
+            "close_timeout": 5,
+        }
+        if proxy:
+            async_client_args["proxy"] = proxy
+
+        return types.HttpOptions(
+            client_args=client_args,
+            async_client_args=async_client_args,
+        )
+
+    @staticmethod
+    def _build_live_config(
+        config: AppConfig,
+        tool_registry: ToolRegistry,
+        session_handle: str | None = None,
+    ) -> types.LiveConnectConfig:
         system_text = (
             "你是一个 Windows 电脑语音助手，名叫 Gemini 助手。\n"
             "用户通过中文语音与你交互，让你操控电脑完成各种任务。\n"
@@ -356,18 +404,23 @@ class GeminiLiveSession:
             "- 不要访问或传输用户的私人数据\n"
             f"\n当前唤醒词：{config.wake_word}"
         )
-        return {
-            "response_modalities": ["AUDIO"],
-            "system_instruction": types.Content(parts=[types.Part(text=system_text)]),
-            "tools": tool_registry.get_tools(),
-            "input_audio_transcription": {},
-            "output_audio_transcription": {},
-            "realtime_input_config": {
-                "automatic_activity_detection": {
-                    "disabled": True,
-                }
-            },
-        }
+        return types.LiveConnectConfig(
+            response_modalities=[types.Modality.AUDIO],
+            system_instruction=types.Content(parts=[types.Part(text=system_text)]),
+            tools=tool_registry.get_tools(),
+            session_resumption=(
+                types.SessionResumptionConfig(handle=session_handle, transparent=True)
+                if session_handle
+                else None
+            ),
+            input_audio_transcription=types.AudioTranscriptionConfig(),
+            output_audio_transcription=types.AudioTranscriptionConfig(),
+            realtime_input_config=types.RealtimeInputConfig(
+                automatic_activity_detection=types.AutomaticActivityDetection(
+                    disabled=True,
+                )
+            ),
+        )
 
     @staticmethod
     def _extract_audio_from_part(part: Any) -> tuple[bytes, int]:
